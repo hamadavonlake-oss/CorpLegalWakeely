@@ -150,6 +150,17 @@ const PERMISSIONS = [
   { code: 'clause.read', name: 'عرض البنود', nameEn: 'Read Clauses', module: 'clauses' },
   { code: 'clause.update', name: 'تعديل بند', nameEn: 'Update Clause', module: 'clauses' },
   { code: 'clause.delete', name: 'حذف بند', nameEn: 'Delete Clause', module: 'clauses' },
+  // ─── Phase 5: Approvals ────────────────────────────────────
+  { code: 'approval.rule.create', name: 'إنشاء قاعدة اعتماد', nameEn: 'Create Approval Rule', module: 'approvals' },
+  { code: 'approval.rule.read', name: 'عرض قواعد الاعتماد', nameEn: 'Read Approval Rules', module: 'approvals' },
+  { code: 'approval.rule.update', name: 'تعديل قاعدة اعتماد', nameEn: 'Update Approval Rule', module: 'approvals' },
+  { code: 'approval.rule.delete', name: 'حذف قاعدة اعتماد', nameEn: 'Delete Approval Rule', module: 'approvals' },
+  { code: 'approval.submit', name: 'إرسال للاعتماد', nameEn: 'Submit for Approval', module: 'approvals' },
+  { code: 'approval.decide', name: 'اتخاذ قرار الاعتماد', nameEn: 'Decide Approval Step', module: 'approvals' },
+  { code: 'approval.delegate', name: 'تفويض خطوة اعتماد', nameEn: 'Delegate Approval Step', module: 'approvals' },
+  { code: 'approval.skip', name: 'تخطي خطوة اعتماد', nameEn: 'Skip Approval Step', module: 'approvals' },
+  { code: 'approval.cancel', name: 'إلغاء طلب اعتماد', nameEn: 'Cancel Approval Instance', module: 'approvals' },
+  { code: 'approval.read', name: 'عرض طلبات الاعتماد', nameEn: 'Read Approval Instances', module: 'approvals' },
 ];
 
 // ─── Role → Permission mapping ─────────────────────────────
@@ -173,6 +184,10 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'document.upload', 'document.download', 'document.legal_hold',
     'template.create', 'template.read', 'template.update', 'template.delete', 'template.fill',
     'clause.create', 'clause.read', 'clause.update', 'clause.delete',
+    // Phase 5
+    'approval.rule.create', 'approval.rule.read', 'approval.rule.update', 'approval.rule.delete',
+    'approval.submit', 'approval.decide', 'approval.delegate', 'approval.skip',
+    'approval.cancel', 'approval.read',
   ],
   legal_admin: [
     'organization.read', 'organization.settings',
@@ -192,6 +207,10 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'document.upload', 'document.download', 'document.legal_hold',
     'template.create', 'template.read', 'template.update', 'template.delete', 'template.fill',
     'clause.create', 'clause.read', 'clause.update', 'clause.delete',
+    // Phase 5
+    'approval.rule.create', 'approval.rule.read', 'approval.rule.update', 'approval.rule.delete',
+    'approval.submit', 'approval.decide', 'approval.delegate', 'approval.skip',
+    'approval.cancel', 'approval.read',
   ],
   general_counsel: [
     'organization.read',
@@ -208,6 +227,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'document.legal_hold',
     'template.read', 'template.fill',
     'clause.read',
+    // Phase 5
+    'approval.rule.read', 'approval.submit', 'approval.decide', 'approval.delegate',
+    'approval.cancel', 'approval.read',
   ],
   lawyer: [
     'organization.read', 'entity.read', 'department.read',
@@ -222,6 +244,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'document.read', 'document.update', 'document.transition', 'document.upload', 'document.download',
     'template.read', 'template.fill',
     'clause.read',
+    // Phase 5
+    'approval.rule.read', 'approval.submit', 'approval.decide', 'approval.delegate',
+    'approval.read',
   ],
   contract_manager: [
     'organization.read', 'entity.read', 'department.read',
@@ -237,6 +262,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'document.download',
     'template.create', 'template.read', 'template.update', 'template.fill',
     'clause.create', 'clause.read', 'clause.update',
+    // Phase 5 — contract managers can submit and decide approvals
+    'approval.rule.read', 'approval.submit', 'approval.decide', 'approval.delegate',
+    'approval.skip', 'approval.read',
   ],
   business_requester: [
     'organization.read',
@@ -248,20 +276,24 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     // Phase 2
     'matter.read',
     'request.read',
-    // Phase 3 — finance can see contract values
+    // Phase 3
     'contract.read',
-    // Phase 4 — finance can read documents (for invoice/payment docs)
+    // Phase 4
     'document.read', 'document.download',
+    // Phase 5 — finance is a primary approver
+    'approval.decide', 'approval.read',
   ],
   executive_approver: [
     'organization.read', 'audit.read',
-    // Phase 2 — read-only visibility for executive oversight
+    // Phase 2
     'matter.read',
     'request.read',
-    // Phase 3 — read-only contract visibility
+    // Phase 3
     'contract.read',
-    // Phase 4 — read-only document visibility
+    // Phase 4
     'document.read', 'document.download',
+    // Phase 5 — executives are approvers
+    'approval.decide', 'approval.read',
   ],
   auditor: [
     'organization.read', 'entity.read', 'department.read', 'user.read', 'audit.read',
@@ -274,6 +306,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     // Phase 4
     'document.read', 'document.download',
     'template.read', 'clause.read',
+    // Phase 5
+    'approval.read',
   ],
   platform_admin: [
     'organization.read', 'organization.update', 'organization.settings',
@@ -293,6 +327,10 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'document.upload', 'document.download', 'document.legal_hold',
     'template.create', 'template.read', 'template.update', 'template.delete', 'template.fill',
     'clause.create', 'clause.read', 'clause.update', 'clause.delete',
+    // Phase 5
+    'approval.rule.create', 'approval.rule.read', 'approval.rule.update', 'approval.rule.delete',
+    'approval.submit', 'approval.decide', 'approval.delegate', 'approval.skip',
+    'approval.cancel', 'approval.read',
   ],
 };
 
@@ -496,6 +534,7 @@ async function main() {
     where: { organizationId_email: { organizationId: org.id, email: DEMO_LAWYER.email } },
   });
 
+  let matter1: { id: string; matterNumber: string } | null = null;
   if (owner && lawyer) {
     // 10a. Three sample legal requests in different states
     const req1 = await prisma.legalRequest.create({
@@ -553,7 +592,7 @@ async function main() {
     console.log(`    → Request: ${req3?.requestNumber ?? 'REQ-0003 (exists)'}`);
 
     // 10b. Two sample matters
-    const matter1 = await prisma.matter.create({
+    matter1 = await prisma.matter.create({
       data: {
         organizationId: org.id,
         entityId: entity.id,
@@ -568,7 +607,7 @@ async function main() {
         responsibleUser: lawyer.id,
         classification: 'restricted',
       },
-    }).catch(() => null);
+    }).catch((): null => null);
     console.log(`    → Matter: ${matter1?.matterNumber ?? 'MTR-0001 (exists)'}`);
 
     const matter2 = await prisma.matter.create({
@@ -619,6 +658,7 @@ async function main() {
   // 11. Phase 3 sample data — Contracts
   console.log('  → Phase 3 sample data: Contracts');
 
+  let contract2: { id: string; contractNumber: string } | null = null;
   if (owner && lawyer && entity) {
     // 11a. Two sample contracts in different states
     const contract1 = await prisma.contract.create({
@@ -644,7 +684,7 @@ async function main() {
     }).catch(() => null);
     console.log(`    → Contract: ${contract1?.contractNumber ?? 'CTR-0001 (exists)'}`);
 
-    const contract2 = await prisma.contract.create({
+    contract2 = await prisma.contract.create({
       data: {
         organizationId: org.id,
         entityId: entity.id,
@@ -667,7 +707,7 @@ async function main() {
         createdBy: owner.id,
         classification: 'internal',
       },
-    }).catch(() => null);
+    }).catch((): null => null);
     console.log(`    → Contract: ${contract2?.contractNumber ?? 'CTR-0002 (exists)'}`);
 
     // 11b. Add parties to contract2 (if it was created)
@@ -867,6 +907,111 @@ async function main() {
         },
       }).catch(() => { /* already exists */ });
       console.log(`    → 2 versions added to ${doc1.documentNumber}`);
+    }
+  }
+
+  // 13. Phase 5 sample data — Approval Rule + Instance
+  console.log('  → Phase 5 sample data: Approval Rule + Instance');
+
+  if (owner && lawyer && contract2) {
+    // 13a. Sample approval rule: "Vendor contracts > 50k"
+    const rule = await prisma.approvalRule.create({
+      data: {
+        organizationId: org.id,
+        name: 'اعتماد عقود التوريد فوق 50,000',
+        nameEn: 'Vendor Contracts > 50k Approval',
+        description: 'يتطلب اعتماد متسلسل من المستشار القانوني ثم المدير المالي لعقود التوريد التي تتجاوز 50,000 دينار',
+        objectType: 'contract',
+        priority: 50,
+        approvalType: 'sequential',
+        isRequired: true,
+        escalationMinutes: 4320, // 3 days
+        createdBy: owner.id,
+        isActive: true,
+      },
+    }).catch(() => null);
+
+    if (rule) {
+      // 13b. Conditions: type = vendor_agreement, total_value > 50000
+      await prisma.approvalRuleCondition.create({
+        data: {
+          ruleId: rule.id,
+          organizationId: org.id,
+          field: 'type',
+          operator: 'equals',
+          value: 'vendor_agreement',
+        },
+      }).catch(() => { /* already exists */ });
+
+      await prisma.approvalRuleCondition.create({
+        data: {
+          ruleId: rule.id,
+          organizationId: org.id,
+          field: 'total_value',
+          operator: 'greater_than',
+          value: '50000',
+        },
+      }).catch(() => { /* already exists */ });
+
+      // 13c. Steps: 1) Legal Review, 2) Finance Approval
+      const step1 = await prisma.approvalRuleStep.create({
+        data: {
+          ruleId: rule.id,
+          organizationId: org.id,
+          stepOrder: 1,
+          name: 'المراجعة القانونية',
+          nameEn: 'Legal Review',
+          approverRole: 'lawyer',
+          assignedUserId: lawyer.id,
+          canDelegate: true,
+          canSkip: false,
+        },
+      }).catch(() => null);
+
+      const step2 = await prisma.approvalRuleStep.create({
+        data: {
+          ruleId: rule.id,
+          organizationId: org.id,
+          stepOrder: 2,
+          name: 'الاعتماد المالي',
+          nameEn: 'Finance Approval',
+          approverRole: 'finance_approver',
+          canDelegate: false,
+          canSkip: false,
+        },
+      }).catch(() => null);
+
+      console.log(`    → Approval rule: ${rule.nameEn} (${rule.priority}, ${2} steps)`);
+
+      // 13d. Sample instance: contract2 submitted for approval
+      const instance = await prisma.approvalInstance.create({
+        data: {
+          organizationId: org.id,
+          ruleId: rule.id,
+          objectType: 'contract',
+          objectId: contract2.id,
+          status: 'pending',
+          currentStepOrder: 1,
+          submittedBy: owner.id,
+          submitNotes: 'تم رفع العقد للاعتماد بعد اكتمال المراجعة الأولية',
+        },
+      }).catch(() => null);
+
+      if (instance && step1) {
+        await prisma.approvalInstanceStep.create({
+          data: {
+            instanceId: instance.id,
+            organizationId: org.id,
+            ruleStepId: step1.id,
+            stepOrder: 1,
+            name: step1.name,
+            nameEn: step1.nameEn,
+            assignedTo: lawyer.id,
+            status: 'pending',
+          },
+        }).catch(() => { /* already exists */ });
+        console.log(`    → Approval instance created for ${contract2.contractNumber}`);
+      }
     }
   }
 

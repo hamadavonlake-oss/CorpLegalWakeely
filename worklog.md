@@ -603,3 +603,61 @@ Stage Summary:
 - SHA-256 content hashes for integrity verification
 - DOCX template rendering via docxtemplater (Phase 6 will add Gotenberg PDF export)
 - Storage abstraction supports MinIO (dev) + AWS S3 (production) via env vars
+
+---
+Task ID: 5-1
+Agent: main
+Task: Phase 5 — Approvals Engine (rules, instances, delegation, escalation, re-approval)
+
+Work Log:
+- Extended prisma/schema.prisma with 5 new models:
+  - ApprovalRule (template: objectType, priority, approvalType sequential/parallel, escalationMinutes, isRequired)
+  - ApprovalRuleCondition (field/operator/value — supports 8 operators on 7 fields)
+  - ApprovalRuleStep (stepOrder, approverRole OR assignedUserId, canDelegate, canSkip)
+  - ApprovalInstance (runtime: status, currentStepOrder, submittedBy, completedAt, linked to object)
+  - ApprovalInstanceStep (runtime per-step: assignedTo, originalAssignee, delegatedTo, decidedBy/at, decisionNotes)
+- Wrote prisma/migrations/20260820030000_phase5_approvals/migration.sql:
+  - Creates 5 tables with FK constraints + CHECK constraints for object_type/approval_type/status/operator/field
+  - Priority >= 0 CHECK, escalation_minutes > 0 CHECK, step_order >= 1 CHECK
+  - Enables RLS + FORCE RLS on all 5 new tables
+  - Tenant isolation policies on all 5 tables
+- Built ApprovalsModule (apps/api/src/approvals/):
+  - Conditions Evaluator (apps/api/src/approvals/conditions-evaluator.ts) — pure function module
+    - evaluateConditions(conditions, objectData) → boolean (all conditions AND'd)
+    - 8 operators: equals, not_equals, greater_than, less_than, greater_than_or_equal, less_than_or_equal, in (comma-list), contains (case-insensitive)
+    - 7 fields: type, category, total_value, total_currency, country_code, entity_id, classification
+    - Document-specific mapping: 'type' → documentType, 'classification' → documentClassification
+  - ApprovalsService (apps/api/src/approvals/approvals.service.ts):
+    - Rule CRUD: createRule (validates step assignees + duplicate step orders), findRule (with includes), listRules (paginated, filterable by objectType/isActive), updateRule (optimistic locking, blocks approvalType change while instances pending), softDeleteRule (blocks if pending instances)
+    - submitForApproval: fetches object (contract/document), validates status, finds FIRST matching rule by priority, resolves approver from assignedUserId or role-based lookup, creates instance + instance steps, sets currentStepOrder for sequential rules
+    - decideStep: validates assignee + current step (sequential), updates step status, calls recomputeInstanceStatus
+    - recomputeInstanceStatus: walks all steps — rejected → instance rejected, changes_requested → instance changes_requested, all approved/skipped → instance approved. For sequential: advances currentStepOrder when current step is done.
+    - delegateStep: validates canDelegate flag + assignee, updates assignedTo + originalAssignee + delegatedTo
+    - skipStep: validates canSkip flag, marks step skipped, recomputes instance (advances sequential)
+    - cancelInstance: submitter or legal_admin/enterprise_owner can cancel; cancels pending steps
+    - triggerReapproval: when approved object is modified, marks approved instances → changes_requested, cancels pending instances (Rule 12 / ADR-008)
+    - findInstance, listInstancesForObject, listMyPendingSteps (with instance.status=pending filter)
+  - Controller with 13 endpoints: rule CRUD, submit, findInstance, listInstancesForObject, cancel, decide, delegate, skip, my-pending
+  - 7 DTOs with class-validator
+- Wired ApprovalsModule into AppModule (now imports 15 modules)
+- Extended seed data:
+  - 10 new approval permissions (4 rule, 6 instance/step) — total now 63
+  - Updated all 10 role-permission mappings with Phase 5 permissions
+  - finance_approver + executive_approver are now primary approvers (approval.decide)
+  - Added 1 sample rule: "Vendor Contracts > 50k Approval" (sequential, 2 steps, escalation 3 days)
+  - Added 2 conditions: type=vendor_agreement, total_value>50000
+  - Added 2 steps: Legal Review (lawyer, canDelegate) → Finance Approval (finance_approver)
+  - Added 1 sample instance: contract2 submitted, currentStepOrder=1, step 1 pending
+- Hoisted matter1 + contract2 variable declarations out of Phase 2/3 blocks so Phase 4/5 can reference them
+
+Tests — 381/381 PASS across 21 suites (+62 new from Phase 4 baseline of 319):
+- conditions-evaluator.spec.ts (24 tests): all 8 operators (equals, not_equals, gt, lt, gte, lte, in, contains), empty conditions match, missing fields reject, multiple conditions AND'd, short-circuit on first fail, unknown operator rejects, document-specific field mapping
+- approvals.service.spec.ts (38 tests): createRule (validation, duplicate step orders, step < 1), submitForApproval (matching, no-match, conflict on existing, invalid contract status, no steps, no assignable user, priority selection), decideStep (approve+advance, final approve, reject, changes_requested, forbidden for non-assignee, wrong step in sequential, already decided, parallel all-must-approve), delegateStep (success, blocked when canDelegate=false, forbidden for non-assignee), skipStep (success + advance, blocked when canSkip=false), cancelInstance (submitter can, non-submitter forbidden, legal_admin can, non-pending rejected), triggerReapproval (cancels pending, marks approved → changes_requested, ignores terminal), listMyPendingSteps (filters by assignee + status + instance.status)
+
+Stage Summary:
+- Phase 5 COMPLETE: ApprovalsModule with rules engine + runtime instances + delegation + skipping + cancellation + re-approval triggers
+- 5 new Prisma models, 1 migration, 6 new files (service, controller, module, DTOs, conditions evaluator, tests), 63 total permissions
+- 381/381 tests pass, 0 TypeScript errors, all packages build
+- Sequential + parallel approval types supported
+- Re-approval trigger integration point ready (will be called from contracts/documents update services in a follow-up)
+- Per ADR-008: sequential/parallel/delegation approvals with escalation

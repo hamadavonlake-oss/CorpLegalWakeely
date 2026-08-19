@@ -201,6 +201,11 @@ model Organization {
   templates      Template[]
   clauses        Clause[]
   templateClauses TemplateClause[]
+  approvalRules  ApprovalRule[]
+  approvalRuleConditions ApprovalRuleCondition[]
+  approvalRuleSteps ApprovalRuleStep[]
+  approvalInstances ApprovalInstance[]
+  approvalInstanceSteps ApprovalInstanceStep[]
 
   @@map("organizations")
 }
@@ -872,6 +877,203 @@ model TemplateClause {
   @@index([clauseId])
   @@index([organizationId])
   @@map("template_clauses")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Approvals (Phase 5)
+// ═══════════════════════════════════════════════════════════════
+//
+// Two-tier design:
+// 1. ApprovalRule + ApprovalRuleCondition + ApprovalRuleStep — the
+//    *template* configured by legal admins: "for vendor contracts
+//    over $50k, require sequential approval from Legal → Finance → CEO"
+// 2. ApprovalInstance + ApprovalInstanceStep — the *runtime* record
+//    created when a contract/document is submitted for approval.
+//    Each step has a status (pending/approved/rejected/changes_requested/
+//    delegated/skipped/escalated) and links to a specific user.
+//
+// Per ADR-008: sequential/parallel/delegation approvals with escalation.
+
+/// ApprovalRule — a configurable approval template.
+/// When a contract/document is submitted for approval, the engine finds
+/// the first matching rule (by conditions) and creates an ApprovalInstance
+/// from its steps.
+model ApprovalRule {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  /// A human-readable name for this rule (e.g. "Vendor contracts > $50k")
+  name            String
+  nameEn          String?  @map("name_en")
+  description     String?
+  /// What this rule applies to: 'contract' or 'document'.
+  objectType      String   @map("object_type")
+  /// Priority for rule matching (lower number = higher priority).
+  /// When multiple rules match, the one with the lowest priority value
+  /// is selected.
+  priority        Int      @default(100)
+  /// Approval type: 'sequential' (steps run in order) or 'parallel'
+  /// (all steps run at once, all must approve).
+  approvalType    String   @default("sequential") @map("approval_type")
+  /// Whether this rule is currently active.
+  isActive        Boolean  @default(true) @map("is_active")
+  /// If true, an approved instance of this rule is required before the
+  /// object can transition to 'approved' status.
+  isRequired      Boolean  @default(true) @map("is_required")
+  /// Escalation: minutes before a pending step is auto-escalated.
+  /// null = no escalation.
+  escalationMinutes Int?  @map("escalation_minutes")
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+  deletedBy       String?  @map("deleted_by")
+  rowVersion      Int      @default(0) @map("row_version")
+
+  organization Organization           @relation(fields: [organizationId], references: [id])
+  conditions   ApprovalRuleCondition[]
+  steps        ApprovalRuleStep[]
+  instances    ApprovalInstance[]
+
+  @@index([organizationId, objectType, isActive])
+  @@index([organizationId, priority])
+  @@map("approval_rules")
+}
+
+/// ApprovalRuleCondition — a single condition that must match for the
+/// rule to apply. Multiple conditions on a rule are AND'd together.
+/// Example: { field: 'type', operator: 'equals', value: 'vendor_agreement' }
+///          { field: 'total_value', operator: 'greater_than', value: '50000' }
+model ApprovalRuleCondition {
+  id              String   @id @default(uuid())
+  ruleId          String   @map("rule_id")
+  organizationId  String   @map("organization_id")
+  /// The field to evaluate. Supported: 'type', 'category', 'total_value',
+  /// 'total_currency', 'country_code', 'entity_id', 'classification'.
+  field           String
+  /// Comparison operator: 'equals', 'not_equals', 'greater_than',
+  /// 'less_than', 'greater_than_or_equal', 'less_than_or_equal',
+  /// 'in', 'contains'.
+  operator        String
+  /// The comparison value (string; for numeric fields it's parsed).
+  /// For 'in' operator, this is a comma-separated list.
+  value           String
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  rule       ApprovalRule  @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([ruleId])
+  @@index([organizationId])
+  @@map("approval_rule_conditions")
+}
+
+/// ApprovalRuleStep — a step in the approval template.
+/// For sequential rules, steps run in order of `stepOrder`.
+/// For parallel rules, all steps run at once.
+model ApprovalRuleStep {
+  id              String   @id @default(uuid())
+  ruleId          String   @map("rule_id")
+  organizationId  String   @map("organization_id")
+  stepOrder       Int      @map("step_order")
+  /// Name for this step (e.g. "Legal Review", "Finance Approval", "CEO Sign-off")
+  name            String
+  nameEn          String?  @map("name_en")
+  /// Which role should approve this step. The actual user is resolved at
+  /// runtime from the contract's assignedTo + the organization's roles.
+  /// If `assignedUserId` is set, that specific user is used instead.
+  approverRole    String?  @map("approver_role")
+  /// Specific user ID to assign this step to (overrides role-based assignment).
+  assignedUserId  String?  @map("assigned_user_id")
+  /// Whether delegation is allowed for this step.
+  canDelegate     Boolean  @default(false) @map("can_delegate")
+  /// Whether this step can be skipped (auto-approved).
+  canSkip         Boolean  @default(false) @map("can_skip")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  rule       ApprovalRule         @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  organization Organization        @relation(fields: [organizationId], references: [id])
+  instances  ApprovalInstanceStep[]
+
+  @@index([ruleId])
+  @@index([organizationId])
+  @@map("approval_rule_steps")
+}
+
+/// ApprovalInstance — a runtime approval flow created when a contract
+/// or document is submitted for approval. Linked to a rule (which
+/// defines the steps) and to the object being approved.
+model ApprovalInstance {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  ruleId          String   @map("rule_id")
+  /// What's being approved: 'contract' or 'document'.
+  objectType      String   @map("object_type")
+  objectId        String   @map("object_id")
+  /// Current status of the instance:
+  /// 'pending' (in progress), 'approved' (all steps approved),
+  /// 'rejected' (any step rejected), 'changes_requested' (returned for edits),
+  /// 'cancelled' (cancelled before completion), 'expired' (escalation timeout)
+  status          String   @default("pending")
+  /// Which step is currently active (for sequential rules).
+  /// null = all steps complete or running in parallel.
+  currentStepOrder Int?   @map("current_step_order")
+  /// When the instance was submitted.
+  submittedAt     DateTime @default(now()) @map("submitted_at")
+  /// When the instance was completed (approved/rejected/cancelled).
+  completedAt     DateTime? @map("completed_at")
+  submittedBy     String   @map("submitted_by")
+  /// Free-text notes from the submitter.
+  submitNotes     String?  @map("submit_notes")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  rule       ApprovalRule           @relation(fields: [ruleId], references: [id])
+  organization Organization          @relation(fields: [organizationId], references: [id])
+  steps      ApprovalInstanceStep[]
+
+  @@index([organizationId, objectType, objectId])
+  @@index([organizationId, status])
+  @@index([ruleId])
+  @@map("approval_instances")
+}
+
+/// ApprovalInstanceStep — runtime record for a single step's approval.
+model ApprovalInstanceStep {
+  id              String   @id @default(uuid())
+  instanceId      String   @map("instance_id")
+  organizationId  String   @map("organization_id")
+  ruleStepId      String?  @map("rule_step_id")
+  stepOrder       Int      @map("step_order")
+  name            String
+  nameEn          String?  @map("name_en")
+  /// The user assigned to approve this step. May change due to delegation.
+  assignedTo      String   @map("assigned_to")
+  /// Original assignee (before delegation). null if no delegation.
+  originalAssignee String? @map("original_assignee")
+  /// Status of this step:
+  /// 'pending', 'approved', 'rejected', 'changes_requested',
+  /// 'delegated', 'skipped', 'escalated'
+  status          String   @default("pending")
+  decidedBy       String?  @map("decided_by")
+  decidedAt       DateTime? @map("decided_at")
+  decisionNotes   String?  @map("decision_notes")
+  /// For delegation: who this step was delegated to.
+  delegatedTo     String?  @map("delegated_to")
+  /// For escalation: when this step was escalated.
+  escalatedAt     DateTime? @map("escalated_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  instance    ApprovalInstance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  ruleStep    ApprovalRuleStep? @relation(fields: [ruleStepId], references: [id])
+  organization Organization      @relation(fields: [organizationId], references: [id])
+
+  @@index([instanceId])
+  @@index([organizationId, status])
+  @@index([assignedTo])
+  @@index([ruleStepId])
+  @@map("approval_instance_steps")
 }
 
 // ═══════════════════════════════════════════════════════════════
