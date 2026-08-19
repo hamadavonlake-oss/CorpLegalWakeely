@@ -9,6 +9,7 @@ import { AuditModule } from './audit/audit.module';
 import { LegalRequestsModule } from './requests/legal-requests.module';
 import { MattersModule } from './matters/matters.module';
 import { ConflictChecksModule } from './conflict-checks/conflict-checks.module';
+import { ContractsModule } from './contracts/contracts.module';
 
 @Module({
   imports: [
@@ -23,6 +24,8 @@ import { ConflictChecksModule } from './conflict-checks/conflict-checks.module';
     LegalRequestsModule,
     MattersModule,
     ConflictChecksModule,
+    // Phase 3 — Contracts
+    ContractsModule,
   ],
 })
 export class AppModule {}

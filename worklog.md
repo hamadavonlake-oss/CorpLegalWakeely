@@ -473,3 +473,58 @@ Stage Summary:
 - 189/189 tests pass, 0 TypeScript errors, all 4 packages build
 - 6 new files for state machines, 4 new modules (28 files total), 1 migration, seed extended
 - Known limitation: RLS migration written but not verified against a real PostgreSQL instance (Docker unavailable in build env). Unit tests verify the application-layer contract (SET_CONFIG before callback, per-org isolation)
+
+---
+Task ID: 3-1
+Agent: main
+Task: Phase 3 — Contracts (13-state machine, parties, values, signatures)
+
+Work Log:
+- Extended prisma/schema.prisma with 5 new models:
+  - Contract (13-state machine, FK to Entity + Matter, total_value/currency, effective/expiry dates, classification)
+  - ContractParty (internal/external, JSONB contact_info, registration_no, tax_id)
+  - ContractValue (base/tax/fee/discount/penalty, Decimal(18,3), multi-year support)
+  - ContractSignature (manual signature tracking — signer, sequence, status, signed_document_url)
+  - ContractDocumentLink (forward-compatible placeholder for Phase 4 documents)
+- Added back-relations on Organization, Entity, Matter
+- Wrote prisma/migrations/20260820010000_phase3_contracts/migration.sql:
+  - Creates 5 tables with FK constraints + CHECK constraints for status/value_type/party_type/link_type
+  - amount >= 0 CHECK on contract_values
+  - sequence >= 1 CHECK on contract_signatures
+  - Unique constraint on (contract_id, document_id, link_type)
+  - Enables RLS + FORCE RLS on all 5 new tables
+  - Tenant isolation policies on all 5 tables
+- Built ContractsModule (apps/api/src/contracts/):
+  - 13-state machine: draft → under_review → changes_requested → pending_approval → approved → pending_signature → signed → active → expired | terminated | archived | rejected | draft_new_version
+  - CONTRACT_TRANSITIONS map as single source of truth
+  - CONTRACT_EDITABLE_STATES set (draft, under_review, changes_requested, draft_new_version)
+  - CONTRACT_ACTIVE_STATES set (active, signed, pending_signature)
+  - Service methods (all in single ContractsService for cohesion):
+    - Contract CRUD: create, findOne, list, update (optimistic locking + editable states only), transition (with audit), softDelete (draft only)
+    - Parties: addParty (validates entityId for internal, blocks non-editable states), listParties, updateParty, removeParty
+    - Values: addValue (auto-updates contract.totalValue for base type), listValues, removeValue
+    - Signatures: addSignature (allowed in draft/approved/pending_signature/draft_new_version), listSignatures, recordSignature (manual status + signedDocumentUrl + returns allSignaturesComplete flag)
+  - Per-org sequential contract numbers: CTR-YYYY-NNNN
+  - Validates effectiveDate < expiryDate
+  - When transitioning to active, auto-sets effectiveDate to now if missing
+  - Controller with 14 endpoints: CRUD + transition + parties + values + signatures
+  - 15 DTOs with class-validator
+- Wired ContractsModule into AppModule (now imports 10 modules)
+- Extended seed data:
+  - Added 7 new contract permissions (create, read, update, transition, delete, party.manage, value.manage, signature.manage) — total now 36
+  - Updated all 10 role-permission mappings: contract_manager is now the primary contract user
+  - Added 2 sample contracts (NDA in draft, vendor agreement in pending_signature)
+  - Added 2 parties to contract2 (internal buyer + external seller with contact_info JSON)
+  - Added 2 value lines to contract2 (base 75000 JOD + tax 12000 JOD)
+  - Added 2 signature records to contract2 (sequence 1 + 2, both pending)
+
+Tests — 258/258 PASS across 16 suites (+69 new from Phase 2 baseline of 189):
+- contract.state-machine.spec.ts (33 tests): all 13 statuses, full happy-path lifecycle (draft → ... → active → expired → draft_new_version → under_review), reviewer feedback paths, invalid transitions, terminal states, editable/active state sets
+- contracts.service.spec.ts (36 tests): create (validation of entityId/matterId/assignedTo/dates), transition (all happy paths + auto-effectiveDate + invalid + RLS + idempotent), update (optimistic locking + non-editable states), softDelete, addParty (internal/external + non-editable states), addValue (auto-totalValue + non-editable states), signatures (add + record + already-signed + allSignaturesComplete flag + non-editable states), findOne (RLS), list
+
+Stage Summary:
+- Phase 3 COMPLETE: ContractsModule with 13-state machine + parties + values + manual signatures
+- 5 new Prisma models, 1 migration, 7 new module files, 36 total permissions
+- 258/258 tests pass, 0 TypeScript errors, all packages build
+- Manual signature tracking per Rule 4 (NO embedded e-signature — only records signer name, date, and uploaded signed copy URL)
+- ContractDocumentLink model is forward-compatible for Phase 4 (Documents)

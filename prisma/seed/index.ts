@@ -123,6 +123,15 @@ const PERMISSIONS = [
   { code: 'conflict_check.read', name: 'عرض فحوصات التعارض', nameEn: 'Read Conflict Checks', module: 'conflict-checks' },
   { code: 'conflict_check.update', name: 'تعديل فحص تعارض', nameEn: 'Update Conflict Check', module: 'conflict-checks' },
   { code: 'conflict_check.transition', name: 'تغيير حالة فحص التعارض', nameEn: 'Transition Conflict Check', module: 'conflict-checks' },
+  // ─── Phase 3: Contracts ────────────────────────────────────
+  { code: 'contract.create', name: 'إنشاء عقد', nameEn: 'Create Contract', module: 'contracts' },
+  { code: 'contract.read', name: 'عرض العقود', nameEn: 'Read Contracts', module: 'contracts' },
+  { code: 'contract.update', name: 'تعديل عقد', nameEn: 'Update Contract', module: 'contracts' },
+  { code: 'contract.transition', name: 'تغيير حالة العقد', nameEn: 'Transition Contract', module: 'contracts' },
+  { code: 'contract.delete', name: 'حذف عقد', nameEn: 'Delete Contract', module: 'contracts' },
+  { code: 'contract.party.manage', name: 'إدارة أطراف العقد', nameEn: 'Manage Contract Parties', module: 'contracts' },
+  { code: 'contract.value.manage', name: 'إدارة قيم العقد', nameEn: 'Manage Contract Values', module: 'contracts' },
+  { code: 'contract.signature.manage', name: 'إدارة توقيعات العقد', nameEn: 'Manage Contract Signatures', module: 'contracts' },
 ];
 
 // ─── Role → Permission mapping ─────────────────────────────
@@ -138,6 +147,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'request.create', 'request.read', 'request.update', 'request.transition', 'request.delete',
     'matter.create', 'matter.read', 'matter.update', 'matter.transition', 'matter.convert',
     'conflict_check.create', 'conflict_check.read', 'conflict_check.update', 'conflict_check.transition',
+    // Phase 3
+    'contract.create', 'contract.read', 'contract.update', 'contract.transition', 'contract.delete',
+    'contract.party.manage', 'contract.value.manage', 'contract.signature.manage',
   ],
   legal_admin: [
     'organization.read', 'organization.settings',
@@ -149,6 +161,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'request.create', 'request.read', 'request.update', 'request.transition', 'request.delete',
     'matter.create', 'matter.read', 'matter.update', 'matter.transition', 'matter.convert',
     'conflict_check.create', 'conflict_check.read', 'conflict_check.update', 'conflict_check.transition',
+    // Phase 3
+    'contract.create', 'contract.read', 'contract.update', 'contract.transition', 'contract.delete',
+    'contract.party.manage', 'contract.value.manage', 'contract.signature.manage',
   ],
   general_counsel: [
     'organization.read',
@@ -157,6 +172,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'request.read', 'request.transition',
     'matter.read', 'matter.update', 'matter.transition',
     'conflict_check.read', 'conflict_check.transition',
+    // Phase 3
+    'contract.read', 'contract.update', 'contract.transition',
+    'contract.party.manage', 'contract.value.manage', 'contract.signature.manage',
   ],
   lawyer: [
     'organization.read', 'entity.read', 'department.read',
@@ -164,6 +182,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'request.read', 'request.update', 'request.transition',
     'matter.read', 'matter.update', 'matter.transition',
     'conflict_check.read', 'conflict_check.update', 'conflict_check.transition',
+    // Phase 3
+    'contract.read', 'contract.update', 'contract.transition',
+    'contract.party.manage', 'contract.value.manage', 'contract.signature.manage',
   ],
   contract_manager: [
     'organization.read', 'entity.read', 'department.read',
@@ -171,6 +192,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'request.read',
     'matter.read',
     'conflict_check.read',
+    // Phase 3 — contract managers are the primary contract users
+    'contract.create', 'contract.read', 'contract.update', 'contract.transition',
+    'contract.party.manage', 'contract.value.manage', 'contract.signature.manage',
   ],
   business_requester: [
     'organization.read',
@@ -179,15 +203,19 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   ],
   finance_approver: [
     'organization.read', 'audit.read',
-    // Phase 2 — read-only visibility into matters for finance context
+    // Phase 2
     'matter.read',
     'request.read',
+    // Phase 3 — finance can see contract values
+    'contract.read',
   ],
   executive_approver: [
     'organization.read', 'audit.read',
     // Phase 2 — read-only visibility for executive oversight
     'matter.read',
     'request.read',
+    // Phase 3 — read-only contract visibility
+    'contract.read',
   ],
   auditor: [
     'organization.read', 'entity.read', 'department.read', 'user.read', 'audit.read',
@@ -195,6 +223,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'request.read',
     'matter.read',
     'conflict_check.read',
+    // Phase 3
+    'contract.read',
   ],
   platform_admin: [
     'organization.read', 'organization.update', 'organization.settings',
@@ -206,6 +236,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'request.create', 'request.read', 'request.update', 'request.transition', 'request.delete',
     'matter.create', 'matter.read', 'matter.update', 'matter.transition', 'matter.convert',
     'conflict_check.create', 'conflict_check.read', 'conflict_check.update', 'conflict_check.transition',
+    // Phase 3
+    'contract.create', 'contract.read', 'contract.update', 'contract.transition', 'contract.delete',
+    'contract.party.manage', 'contract.value.manage', 'contract.signature.manage',
   ],
 };
 
@@ -526,6 +559,151 @@ async function main() {
         },
       }).catch(() => { /* already exists */ });
       console.log(`    → Conflict check on ${matter1.matterNumber}`);
+    }
+  }
+
+  // 11. Phase 3 sample data — Contracts
+  console.log('  → Phase 3 sample data: Contracts');
+
+  if (owner && lawyer && entity) {
+    // 11a. Two sample contracts in different states
+    const contract1 = await prisma.contract.create({
+      data: {
+        organizationId: org.id,
+        entityId: entity.id,
+        contractNumber: `CTR-${new Date().getUTCFullYear()}-0001`,
+        title: 'اتفاقية عدم إفصاح - شركة الموردين المتحدون',
+        titleEn: 'NDA - United Suppliers Co.',
+        description: 'اتفاقية عدم إفصاح متبادل مع شركة الموردين المتحدون قبل بدء المفاوضات',
+        type: 'nda',
+        category: 'nda',
+        status: 'draft',
+        priority: 'medium',
+        counterpartyName: 'شركة الموردين المتحدون',
+        counterpartyNameEn: 'United Suppliers Co.',
+        totalValue: null,
+        totalCurrency: 'JOD',
+        assignedTo: lawyer.id,
+        createdBy: owner.id,
+        classification: 'confidential',
+      },
+    }).catch(() => null);
+    console.log(`    → Contract: ${contract1?.contractNumber ?? 'CTR-0001 (exists)'}`);
+
+    const contract2 = await prisma.contract.create({
+      data: {
+        organizationId: org.id,
+        entityId: entity.id,
+        matterId: matter1?.id ?? null,
+        contractNumber: `CTR-${new Date().getUTCFullYear()}-0002`,
+        title: 'عقد توريد سنوي - معدات تقنية',
+        titleEn: 'Annual Supply Contract - Tech Equipment',
+        description: 'عقد توريد معدات تقنية لمدة سنة مع شركة التقنية الحديثة',
+        type: 'vendor_agreement',
+        category: 'vendor',
+        status: 'pending_signature',
+        priority: 'high',
+        effectiveDate: new Date('2026-01-01'),
+        expiryDate: new Date('2026-12-31'),
+        counterpartyName: 'شركة التقنية الحديثة',
+        counterpartyNameEn: 'Modern Tech Co.',
+        totalValue: 75000,
+        totalCurrency: 'JOD',
+        assignedTo: lawyer.id,
+        createdBy: owner.id,
+        classification: 'internal',
+      },
+    }).catch(() => null);
+    console.log(`    → Contract: ${contract2?.contractNumber ?? 'CTR-0002 (exists)'}`);
+
+    // 11b. Add parties to contract2 (if it was created)
+    if (contract2) {
+      await prisma.contractParty.create({
+        data: {
+          contractId: contract2.id,
+          organizationId: org.id,
+          partyType: 'internal',
+          entityId: entity.id,
+          name: entity.name,
+          nameEn: entity.nameEn,
+          role: 'buyer',
+          registrationNo: entity.registrationNo,
+        },
+      }).catch(() => { /* already exists */ });
+
+      await prisma.contractParty.create({
+        data: {
+          contractId: contract2.id,
+          organizationId: org.id,
+          partyType: 'external',
+          name: 'شركة التقنية الحديثة',
+          nameEn: 'Modern Tech Co.',
+          role: 'seller',
+          contactInfo: {
+            email: 'legal@moderntech.example',
+            phone: '+962-6-555-1234',
+            address: 'عمان، الأردن',
+          },
+          registrationNo: 'CR-2024-009988',
+          taxId: 'TAX-2024-5678',
+        },
+      }).catch(() => { /* already exists */ });
+      console.log(`    → Parties added to ${contract2.contractNumber}`);
+    }
+
+    // 11c. Add value lines to contract2
+    if (contract2) {
+      await prisma.contractValue.create({
+        data: {
+          contractId: contract2.id,
+          organizationId: org.id,
+          valueType: 'base',
+          description: ' Base price for tech equipment supply',
+          amount: 75000,
+          currency: 'JOD',
+        },
+      }).catch(() => { /* already exists */ });
+
+      await prisma.contractValue.create({
+        data: {
+          contractId: contract2.id,
+          organizationId: org.id,
+          valueType: 'tax',
+          description: 'VAT 16%',
+          amount: 12000,
+          currency: 'JOD',
+        },
+      }).catch(() => { /* already exists */ });
+      console.log(`    → Values added to ${contract2.contractNumber}`);
+    }
+
+    // 11d. Add signatures to contract2 (pending)
+    if (contract2) {
+      await prisma.contractSignature.create({
+        data: {
+          contractId: contract2.id,
+          organizationId: org.id,
+          signerName: 'سعيد الحسيني',
+          signerNameEn: 'Saeed Al-Husayni',
+          signerTitle: 'CEO',
+          signerUserId: owner.id,
+          sequence: 1,
+          status: 'pending',
+        },
+      }).catch(() => { /* already exists */ });
+
+      await prisma.contractSignature.create({
+        data: {
+          contractId: contract2.id,
+          organizationId: org.id,
+          signerName: 'مدير التقنية الحديثة',
+          signerNameEn: 'Modern Tech CEO',
+          signerTitle: 'CEO',
+          sequence: 2,
+          status: 'pending',
+        },
+      }).catch(() => { /* already exists */ });
+      console.log(`    → Signatures added to ${contract2.contractNumber}`);
     }
   }
 

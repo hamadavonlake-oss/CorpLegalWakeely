@@ -191,6 +191,11 @@ model Organization {
   legalRequests  LegalRequest[]
   matters        Matter[]
   conflictChecks ConflictCheck[]
+  contracts      Contract[]
+  contractParties ContractParty[]
+  contractValues  ContractValue[]
+  contractSignatures ContractSignature[]
+  contractDocumentLinks ContractDocumentLink[]
 
   @@map("organizations")
 }
@@ -230,6 +235,8 @@ model Entity {
   departments     Department[]
   legalRequests   LegalRequest[]
   matters         Matter[]
+  contracts       Contract[]
+  contractParties ContractParty[]
 
   @@unique([organizationId, registrationNo])
   @@map("entities")
@@ -436,6 +443,7 @@ model Matter {
   organization Organization @relation(fields: [organizationId], references: [id])
   entity       Entity?                   @relation(fields: [entityId], references: [id])
   requestLinks LegalRequestMatterLink[]
+  contracts    Contract[]
 
   @@unique([organizationId, matterNumber])
   @@index([organizationId, status])
@@ -478,6 +486,175 @@ model ConflictCheck {
   @@index([parentType, parentId])
   @@index([checkedBy])
   @@map("conflict_checks")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Contracts (Phase 3)
+// ═══════════════════════════════════════════════════════════════
+
+/// Contract — 13-state machine per build-pack/02-mvp-prd.md.
+/// Links to Matter (optional), Entity (optional), and has many parties,
+/// values, signature records, and document links.
+model Contract {
+  id               String         @id @default(uuid())
+  organizationId   String         @map("organization_id")
+  entityId         String?        @map("entity_id")
+  matterId         String?        @map("matter_id")
+  contractNumber   String         @map("contract_number")
+  title            String
+  titleEn          String?        @map("title_en")
+  description      String?
+  type             String?
+  /// Free-text category: e.g. 'nda', 'saas', 'employment', 'vendor'.
+  category         String?
+  status           ContractStatus @default(draft)
+  priority         String?        @default("medium")
+  /// ISO date string (YYYY-MM-DD). Effective date when contract becomes active.
+  effectiveDate    DateTime?      @map("effective_date")
+  /// ISO date string. When the contract expires (if applicable).
+  expiryDate       DateTime?      @map("expiry_date")
+  /// Counterparty identifier (free text) — full party info in ContractParty.
+  counterpartyName String?        @map("counterparty_name")
+  counterpartyNameEn String?      @map("counterparty_name_en")
+  /// Contract value summary (for dashboard display). Detailed breakdown in ContractValue.
+  totalValue       Decimal?       @map("total_value") @db.Decimal(18, 3)
+  totalCurrency    String?        @map("total_currency")
+  assignedTo       String?        @map("assigned_to")
+  createdBy        String         @map("created_by")
+  classification   ClassificationLevel @default(internal)
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+  deletedAt        DateTime?      @map("deleted_at")
+  deletedBy        String?        @map("deleted_by")
+  rowVersion       Int            @default(0) @map("row_version")
+
+  organization Organization     @relation(fields: [organizationId], references: [id])
+  entity       Entity?           @relation(fields: [entityId], references: [id])
+  matter       Matter?           @relation(fields: [matterId], references: [id])
+  parties      ContractParty[]
+  values       ContractValue[]
+  signatures   ContractSignature[]
+  documentLinks ContractDocumentLink[]
+
+  @@unique([organizationId, contractNumber])
+  @@index([organizationId, status])
+  @@index([matterId])
+  @@index([entityId])
+  @@index([assignedTo])
+  @@index([effectiveDate])
+  @@index([expiryDate])
+  @@map("contracts")
+}
+
+/// Contract Party — internal or external party to a contract.
+/// A contract has many parties, each with a role (e.g. 'buyer', 'seller',
+/// 'guarantor'). External parties are free-text; internal parties link
+/// to an Entity within the organization.
+model ContractParty {
+  id              String   @id @default(uuid())
+  contractId      String   @map("contract_id")
+  organizationId  String   @map("organization_id")
+  /// 'internal' links to an Entity; 'external' is free-text.
+  partyType       String   @map("party_type")
+  entityId        String?  @map("entity_id")
+  /// Free-text name for external parties, or display override for internal.
+  name            String
+  nameEn          String?  @map("name_en")
+  /// Role of this party in the contract: 'buyer', 'seller', 'guarantor', etc.
+  role            String
+  /// Contact info: email, phone, address (JSON object).
+  contactInfo     Json?    @map("contact_info") @db.JsonB
+  registrationNo  String?  @map("registration_no")
+  taxId           String?  @map("tax_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  contract      Contract      @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  organization  Organization  @relation(fields: [organizationId], references: [id])
+  entity        Entity?       @relation(fields: [entityId], references: [id])
+
+  @@index([contractId])
+  @@index([organizationId])
+  @@index([entityId])
+  @@map("contract_parties")
+}
+
+/// Contract Value — financial breakdown of a contract.
+/// A contract can have multiple value lines (base price, taxes, fees).
+model ContractValue {
+  id              String   @id @default(uuid())
+  contractId      String   @map("contract_id")
+  organizationId  String   @map("organization_id")
+  /// Type of value: 'base', 'tax', 'fee', 'discount', 'penalty'.
+  valueType       String   @map("value_type")
+  description     String?
+  amount          Decimal  @db.Decimal(18, 3)
+  currency        String
+  /// For multi-year contracts, the year this value applies to (1-indexed).
+  year            Int?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  contract      Contract      @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  organization  Organization  @relation(fields: [organizationId], references: [id])
+
+  @@index([contractId])
+  @@index([organizationId])
+  @@map("contract_values")
+}
+
+/// Contract Signature — manual signature tracking (no e-signature per Rule 4).
+/// Each row records one signer's signature status + uploaded signed copy.
+model ContractSignature {
+  id              String          @id @default(uuid())
+  contractId      String          @map("contract_id")
+  organizationId  String          @map("organization_id")
+  /// Signer's full name (free text — may be external).
+  signerName      String          @map("signer_name")
+  signerNameEn    String?         @map("signer_name_en")
+  /// Signer's title/role: 'CEO', 'CFO', 'Legal Counsel', etc.
+  signerTitle     String?         @map("signer_title")
+  /// For internal signers, link to a user; for external, null.
+  signerUserId    String?         @map("signer_user_id")
+  /// Order in the signing sequence (1 = first signer).
+  sequence        Int             @default(1)
+  status          SignatureStatus @default(pending)
+  signedAt        DateTime?       @map("signed_at")
+  /// Path/URL to the uploaded signed page or full signed copy.
+  signedDocumentUrl String?       @map("signed_document_url")
+  notes           String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  contract      Contract      @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  organization  Organization  @relation(fields: [organizationId], references: [id])
+
+  @@index([contractId])
+  @@index([organizationId])
+  @@index([signerUserId])
+  @@map("contract_signatures")
+}
+
+/// Contract-Document link (deferred to Phase 4 but the model is here for FK).
+/// Polymorphic-style: stores the document_id as a string (Phase 4 will add
+/// the Document model). For now this is a forward-compatible placeholder.
+model ContractDocumentLink {
+  id              String   @id @default(uuid())
+  contractId      String   @map("contract_id")
+  organizationId  String   @map("organization_id")
+  /// Reference to a Document (Phase 4). Stored as string for now.
+  documentId      String   @map("document_id")
+  /// Type of link: 'source', 'signed_copy', 'amendment', 'exhibit'.
+  linkType        String   @map("link_type")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  contract      Contract      @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  organization  Organization  @relation(fields: [organizationId], references: [id])
+
+  @@unique([contractId, documentId, linkType])
+  @@index([contractId])
+  @@index([organizationId])
+  @@map("contract_document_links")
 }
 
 // ═══════════════════════════════════════════════════════════════
