@@ -10,6 +10,10 @@ import { LegalRequestsModule } from './requests/legal-requests.module';
 import { MattersModule } from './matters/matters.module';
 import { ConflictChecksModule } from './conflict-checks/conflict-checks.module';
 import { ContractsModule } from './contracts/contracts.module';
+import { StorageModule } from './storage/storage.module';
+import { DocumentsModule } from './documents/documents.module';
+import { TemplatesModule } from './templates/templates.module';
+import { ClausesModule } from './clauses/clauses.module';
 
 @Module({
   imports: [
@@ -26,6 +30,11 @@ import { ContractsModule } from './contracts/contracts.module';
     ConflictChecksModule,
     // Phase 3 — Contracts
     ContractsModule,
+    // Phase 4 — Documents & Templates
+    StorageModule,
+    DocumentsModule,
+    TemplatesModule,
+    ClausesModule,
   ],
 })
 export class AppModule {}

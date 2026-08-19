@@ -132,6 +132,24 @@ const PERMISSIONS = [
   { code: 'contract.party.manage', name: 'إدارة أطراف العقد', nameEn: 'Manage Contract Parties', module: 'contracts' },
   { code: 'contract.value.manage', name: 'إدارة قيم العقد', nameEn: 'Manage Contract Values', module: 'contracts' },
   { code: 'contract.signature.manage', name: 'إدارة توقيعات العقد', nameEn: 'Manage Contract Signatures', module: 'contracts' },
+  // ─── Phase 4: Documents & Templates ──────────────────────────
+  { code: 'document.create', name: 'إنشاء مستند', nameEn: 'Create Document', module: 'documents' },
+  { code: 'document.read', name: 'عرض المستندات', nameEn: 'Read Documents', module: 'documents' },
+  { code: 'document.update', name: 'تعديل مستند', nameEn: 'Update Document', module: 'documents' },
+  { code: 'document.transition', name: 'تغيير حالة المستند', nameEn: 'Transition Document', module: 'documents' },
+  { code: 'document.delete', name: 'حذف مستند', nameEn: 'Delete Document', module: 'documents' },
+  { code: 'document.upload', name: 'رفع نسخة مستند', nameEn: 'Upload Document Version', module: 'documents' },
+  { code: 'document.download', name: 'تحميل مستند', nameEn: 'Download Document', module: 'documents' },
+  { code: 'document.legal_hold', name: 'تجميد قانوني للمستند', nameEn: 'Manage Legal Hold', module: 'documents' },
+  { code: 'template.create', name: 'إنشاء قالب', nameEn: 'Create Template', module: 'templates' },
+  { code: 'template.read', name: 'عرض القوالب', nameEn: 'Read Templates', module: 'templates' },
+  { code: 'template.update', name: 'تعديل قالب', nameEn: 'Update Template', module: 'templates' },
+  { code: 'template.delete', name: 'حذف قالب', nameEn: 'Delete Template', module: 'templates' },
+  { code: 'template.fill', name: 'ملء قالب', nameEn: 'Fill Template', module: 'templates' },
+  { code: 'clause.create', name: 'إنشاء بند', nameEn: 'Create Clause', module: 'clauses' },
+  { code: 'clause.read', name: 'عرض البنود', nameEn: 'Read Clauses', module: 'clauses' },
+  { code: 'clause.update', name: 'تعديل بند', nameEn: 'Update Clause', module: 'clauses' },
+  { code: 'clause.delete', name: 'حذف بند', nameEn: 'Delete Clause', module: 'clauses' },
 ];
 
 // ─── Role → Permission mapping ─────────────────────────────
@@ -150,6 +168,11 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     // Phase 3
     'contract.create', 'contract.read', 'contract.update', 'contract.transition', 'contract.delete',
     'contract.party.manage', 'contract.value.manage', 'contract.signature.manage',
+    // Phase 4
+    'document.create', 'document.read', 'document.update', 'document.transition', 'document.delete',
+    'document.upload', 'document.download', 'document.legal_hold',
+    'template.create', 'template.read', 'template.update', 'template.delete', 'template.fill',
+    'clause.create', 'clause.read', 'clause.update', 'clause.delete',
   ],
   legal_admin: [
     'organization.read', 'organization.settings',
@@ -164,6 +187,11 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     // Phase 3
     'contract.create', 'contract.read', 'contract.update', 'contract.transition', 'contract.delete',
     'contract.party.manage', 'contract.value.manage', 'contract.signature.manage',
+    // Phase 4
+    'document.create', 'document.read', 'document.update', 'document.transition', 'document.delete',
+    'document.upload', 'document.download', 'document.legal_hold',
+    'template.create', 'template.read', 'template.update', 'template.delete', 'template.fill',
+    'clause.create', 'clause.read', 'clause.update', 'clause.delete',
   ],
   general_counsel: [
     'organization.read',
@@ -175,6 +203,11 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     // Phase 3
     'contract.read', 'contract.update', 'contract.transition',
     'contract.party.manage', 'contract.value.manage', 'contract.signature.manage',
+    // Phase 4
+    'document.read', 'document.update', 'document.transition', 'document.upload', 'document.download',
+    'document.legal_hold',
+    'template.read', 'template.fill',
+    'clause.read',
   ],
   lawyer: [
     'organization.read', 'entity.read', 'department.read',
@@ -185,6 +218,10 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     // Phase 3
     'contract.read', 'contract.update', 'contract.transition',
     'contract.party.manage', 'contract.value.manage', 'contract.signature.manage',
+    // Phase 4
+    'document.read', 'document.update', 'document.transition', 'document.upload', 'document.download',
+    'template.read', 'template.fill',
+    'clause.read',
   ],
   contract_manager: [
     'organization.read', 'entity.read', 'department.read',
@@ -195,6 +232,11 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     // Phase 3 — contract managers are the primary contract users
     'contract.create', 'contract.read', 'contract.update', 'contract.transition',
     'contract.party.manage', 'contract.value.manage', 'contract.signature.manage',
+    // Phase 4 — contract managers manage templates, clauses, documents
+    'document.create', 'document.read', 'document.update', 'document.transition', 'document.upload',
+    'document.download',
+    'template.create', 'template.read', 'template.update', 'template.fill',
+    'clause.create', 'clause.read', 'clause.update',
   ],
   business_requester: [
     'organization.read',
@@ -208,6 +250,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'request.read',
     // Phase 3 — finance can see contract values
     'contract.read',
+    // Phase 4 — finance can read documents (for invoice/payment docs)
+    'document.read', 'document.download',
   ],
   executive_approver: [
     'organization.read', 'audit.read',
@@ -216,6 +260,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'request.read',
     // Phase 3 — read-only contract visibility
     'contract.read',
+    // Phase 4 — read-only document visibility
+    'document.read', 'document.download',
   ],
   auditor: [
     'organization.read', 'entity.read', 'department.read', 'user.read', 'audit.read',
@@ -225,6 +271,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'conflict_check.read',
     // Phase 3
     'contract.read',
+    // Phase 4
+    'document.read', 'document.download',
+    'template.read', 'clause.read',
   ],
   platform_admin: [
     'organization.read', 'organization.update', 'organization.settings',
@@ -239,6 +288,11 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     // Phase 3
     'contract.create', 'contract.read', 'contract.update', 'contract.transition', 'contract.delete',
     'contract.party.manage', 'contract.value.manage', 'contract.signature.manage',
+    // Phase 4
+    'document.create', 'document.read', 'document.update', 'document.transition', 'document.delete',
+    'document.upload', 'document.download', 'document.legal_hold',
+    'template.create', 'template.read', 'template.update', 'template.delete', 'template.fill',
+    'clause.create', 'clause.read', 'clause.update', 'clause.delete',
   ],
 };
 
@@ -704,6 +758,115 @@ async function main() {
         },
       }).catch(() => { /* already exists */ });
       console.log(`    → Signatures added to ${contract2.contractNumber}`);
+    }
+  }
+
+  // 12. Phase 4 sample data — Clauses + Document
+  console.log('  → Phase 4 sample data: Clauses + Document');
+
+  if (owner && lawyer && contract2) {
+    // 12a. Sample reusable clauses (AR + EN)
+    const clause1 = await prisma.clause.create({
+      data: {
+        organizationId: org.id,
+        code: 'TERM-30D',
+        title: 'شرط الإنهاء بتاريخ 30 يوم',
+        titleEn: '30-Day Termination Clause',
+        category: 'termination',
+        bodyText: 'يجوز لأي من الطرفين إنهاء هذا العقد بموجب إشعار خطي يُرسل قبل 30 يوماً من تاريخ الإنهاء المطلوب.',
+        bodyTextEn: 'Either party may terminate this agreement by providing written notice at least 30 days prior to the desired termination date.',
+        countryCode: 'JO',
+        isActive: true,
+        createdBy: owner.id,
+      },
+    }).catch(() => null);
+    console.log(`    → Clause: ${clause1?.code ?? 'TERM-30D (exists)'}`);
+
+    const clause2 = await prisma.clause.create({
+      data: {
+        organizationId: org.id,
+        code: 'CONF-BIL',
+        title: 'شرط السرية المتبادلة',
+        titleEn: 'Mutual Confidentiality Clause',
+        category: 'confidentiality',
+        bodyText: 'يلتزم الطرفان بالحفاظ على سرية المعلومات المتبادلة بموجب هذا العقد وعدم الإفصاح عنها لأي طرف ثالث دون موافقة خطية مسبقة.',
+        bodyTextEn: 'Both parties agree to maintain the confidentiality of information shared under this agreement and not disclose it to any third party without prior written consent.',
+        countryCode: 'JO',
+        isActive: true,
+        createdBy: owner.id,
+      },
+    }).catch(() => null);
+    console.log(`    → Clause: ${clause2?.code ?? 'CONF-BIL (exists)'}`);
+
+    const clause3 = await prisma.clause.create({
+      data: {
+        organizationId: org.id,
+        code: 'PAY-NET30',
+        title: 'شرط الدفع خلال 30 يوم',
+        titleEn: 'Net 30 Payment Terms',
+        category: 'payment',
+        bodyText: 'تستحق المدفوعات خلال 30 يوماً من تاريخ استلام الفاتورة. أي تأخير في السداد يخضع لرسوم تأخير بنسبة 1% شهرياً.',
+        bodyTextEn: 'Payments are due within 30 days of invoice receipt. Late payments are subject to a 1% monthly late fee.',
+        countryCode: 'JO',
+        isActive: true,
+        createdBy: owner.id,
+      },
+    }).catch(() => null);
+    console.log(`    → Clause: ${clause3?.code ?? 'PAY-NET30 (exists)'}`);
+
+    // 12b. Sample document linked to contract2
+    const doc1 = await prisma.document.create({
+      data: {
+        organizationId: org.id,
+        contractId: contract2.id,
+        documentNumber: `DOC-${new Date().getUTCFullYear()}-0001`,
+        title: 'عقد التوريد السنوي - المسودة الأولى',
+        titleEn: 'Annual Supply Contract - First Draft',
+        description: 'المسودة الأولى لعقد التوريد السنوي مع شركة التقنية الحديثة',
+        type: 'contract_draft',
+        status: 'under_review',
+        classification: 'internal',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        sizeBytes: 48230,
+        contentHash: 'a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456',
+        currentVersion: 2,
+        uploadedBy: lawyer.id,
+      },
+    }).catch(() => null);
+    console.log(`    → Document: ${doc1?.documentNumber ?? 'DOC-0001 (exists)'}`);
+
+    // 12c. Add document version rows
+    if (doc1) {
+      await prisma.documentVersion.create({
+        data: {
+          documentId: doc1.id,
+          organizationId: org.id,
+          versionNumber: 1,
+          storageKey: `documents/${org.id}/${doc1.id}/v1-initial.docx`,
+          filename: 'supply-contract-v1.docx',
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          sizeBytes: 47800,
+          contentHash: 'b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456a1',
+          changeSummary: 'المسودة الأولية للعقد',
+          uploadedBy: lawyer.id,
+        },
+      }).catch(() => { /* already exists */ });
+
+      await prisma.documentVersion.create({
+        data: {
+          documentId: doc1.id,
+          organizationId: org.id,
+          versionNumber: 2,
+          storageKey: `documents/${org.id}/${doc1.id}/v2-revisions.docx`,
+          filename: 'supply-contract-v2.docx',
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          sizeBytes: 48230,
+          contentHash: 'a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456',
+          changeSummary: 'تمت إضافة بنود الإنهاء والسرية بعد المراجعة القانونية',
+          uploadedBy: lawyer.id,
+        },
+      }).catch(() => { /* already exists */ });
+      console.log(`    → 2 versions added to ${doc1.documentNumber}`);
     }
   }
 

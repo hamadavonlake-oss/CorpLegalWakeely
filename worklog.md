@@ -528,3 +528,78 @@ Stage Summary:
 - 258/258 tests pass, 0 TypeScript errors, all packages build
 - Manual signature tracking per Rule 4 (NO embedded e-signature — only records signer name, date, and uploaded signed copy URL)
 - ContractDocumentLink model is forward-compatible for Phase 4 (Documents)
+
+---
+Task ID: 4-1
+Agent: main
+Task: Phase 4 — Documents, Templates, Clauses (immutable versioning)
+
+Work Log:
+- Extended prisma/schema.prisma with 5 new models:
+  - Document (7-state machine, FK to Contract/Matter/LegalRequest, total size/hash, Legal Hold, retention, classification)
+  - DocumentVersion (immutable per-version: storageKey, filename, mimeType, sizeBytes, SHA-256 contentHash, approvedBy/approvedAt)
+  - Template (DOCX template with variablesSchema, defaultValues, locale, countryCode)
+  - Clause (reusable AR+EN clause text with category, version, variables)
+  - TemplateClause (many-to-many link with placeholder name + sort order)
+- Updated ContractDocumentLink to use proper Document FK (was placeholder string in Phase 3)
+- Added back-relations on Organization, Contract, Matter, LegalRequest
+- Wrote prisma/migrations/20260820020000_phase4_documents_templates/migration.sql:
+  - Creates 5 new tables with FK constraints + CHECK constraints for status/classification/virus_scan_status/value_type
+  - Adds size_bytes >= 0 CHECK, version >= 1 CHECK, current_version >= 1 CHECK
+  - Adds real FK from contract_document_links.document_id to documents.id
+  - Enables RLS + FORCE RLS on all 5 new tables
+  - Tenant isolation policies on all new tables
+- Built StorageModule (apps/api/src/storage/):
+  - StorageService interface (upload, download, getSignedDownloadUrl, getSignedUploadUrl, delete, exists, healthCheck)
+  - MinioStorageService implementation (S3-compatible, gracefully falls back to in-memory in dev when MinIO unavailable)
+  - In production (NODE_ENV=production), throws on MinIO unavailable — never falls back
+  - @Global() module so any module can inject StorageService
+  - Per ADR-004: metadata in PostgreSQL, binaries in S3/MinIO via signed URLs
+- Built DocumentsModule (apps/api/src/documents/):
+  - 7-state machine: draft → under_review → changes_requested → approved → exported → filed → archived
+  - DOCUMENT_EDITABLE_STATES set (draft, under_review, changes_requested) — approved/exported/filed/archived are immutable
+  - Per-org sequential document numbers: DOC-YYYY-NNNN
+  - Service methods:
+    - Document CRUD: create (validates contractId/matterId/legalRequestId belong to org), findOne (with includes), list (filters), update (optimistic locking + editable states), transition (with audit, marks version approved when → approved), softDelete (blocked by Legal Hold per Rule 10)
+    - Versions: uploadVersion (immutable — adds new DocumentVersion row, increments currentVersion, computes SHA-256 hash, uploads binary to storage, blocked on approved docs per Rule 12), listVersions, getVersion, getDownloadUrl (signed URL + audit log)
+    - Legal Hold: setLegalHold (idempotent, audit logged with reason)
+    - Retention: setRetention (set/clear retentionUntil date)
+    - Contract links: linkToContract (unique per linkType), unlinkFromContract
+  - Controller with 12 endpoints + multipart file upload via @UseInterceptors(FileInterceptor)
+  - 9 DTOs with class-validator
+- Built TemplatesModule (apps/api/src/templates/):
+  - DOCX templates via docxtemplater + pizzip
+  - Service: create (validates DOCX is parseable), findOne, findByCode, list, update, softDelete
+  - fillTemplate: loads DOCX from storage, merges defaultValues + clause variables + provided variables, renders with docxtemplater, uploads rendered DOCX as a new Document with version 1, returns download URL
+  - linkClause / unlinkClause: many-to-many with TemplateClause (placeholder name + sort order)
+  - Controller with 7 endpoints + multipart upload
+  - 4 DTOs
+- Built ClausesModule (apps/api/src/clauses/):
+  - Reusable clause library (AR + EN body text, category, version, variables)
+  - 13 categories: boilerplate, termination, confidentiality, payment, liability, governing_law, dispute_resolution, force_majeure, indemnification, warranty, assignment, amendment, misc
+  - Service: create, findOne, findByCode, list, update (auto-increments version when bodyText changes), softDelete
+  - Controller with 6 endpoints
+  - 2 DTOs
+- Wired StorageModule, DocumentsModule, TemplatesModule, ClausesModule into AppModule (now imports 14 modules)
+- Installed docxtemplater, pizzip, multer, @nestjs/platform-express, @types/multer
+- Extended seed data:
+  - 17 new permissions (8 document, 5 template, 4 clause) — total now 53
+  - Updated all 10 role-permission mappings with Phase 4 permissions
+  - contract_manager is now the primary template + clause manager
+  - Added 3 sample clauses (TERM-30D, CONF-BIL, PAY-NET30 — all AR+EN bilingual)
+  - Added 1 sample document linked to contract2 (under_review, 2 versions)
+
+Tests — 319/319 PASS across 19 suites (+61 new from Phase 3 baseline of 258):
+- document.state-machine.spec.ts (21 tests): all 7 statuses, happy-path lifecycle (draft → under_review → approved → exported → filed → archived), reviewer feedback paths, immutability checks (approved → draft rejected), terminal state
+- documents.service.spec.ts (28 tests): create (validation of contractId/matterId), uploadVersion (immutable versioning, SHA-256 hash computation, blocked on approved/archived), transition (sets approvedBy/approvedAt + marks version approved, invalid transitions, idempotent), update (optimistic locking, editable states), Legal Hold (toggle, blocks soft-delete, idempotent), Retention (set/clear), Contract links (link + duplicate detection), getDownloadUrl (signed URL + audit)
+- clauses.service.spec.ts (12 tests): create, findOne (RLS), findByCode, update (auto-increment version on bodyText change, optimistic locking), softDelete, list (with category filter)
+
+Stage Summary:
+- Phase 4 COMPLETE: Documents, Templates, Clauses modules + Storage abstraction
+- 5 new Prisma models, 1 migration, 19 new files (services, controllers, DTOs, tests, state machine, storage interface + impl), 53 total permissions
+- 319/319 tests pass, 0 TypeScript errors, all packages build
+- Immutable approved document versions per Rule 12
+- Legal Hold prevents permanent deletion per Rule 10
+- SHA-256 content hashes for integrity verification
+- DOCX template rendering via docxtemplater (Phase 6 will add Gotenberg PDF export)
+- Storage abstraction supports MinIO (dev) + AWS S3 (production) via env vars

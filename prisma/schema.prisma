@@ -196,6 +196,11 @@ model Organization {
   contractValues  ContractValue[]
   contractSignatures ContractSignature[]
   contractDocumentLinks ContractDocumentLink[]
+  documents      Document[]
+  documentVersions DocumentVersion[]
+  templates      Template[]
+  clauses        Clause[]
+  templateClauses TemplateClause[]
 
   @@map("organizations")
 }
@@ -398,6 +403,7 @@ model LegalRequest {
   organization Organization @relation(fields: [organizationId], references: [id])
   entity       Entity?      @relation(fields: [entityId], references: [id])
   matterLinks  LegalRequestMatterLink[]
+  documents    Document[]
 
   @@unique([organizationId, requestNumber])
   @@index([organizationId, status])
@@ -444,6 +450,7 @@ model Matter {
   entity       Entity?                   @relation(fields: [entityId], references: [id])
   requestLinks LegalRequestMatterLink[]
   contracts    Contract[]
+  documents    Document[]
 
   @@unique([organizationId, matterNumber])
   @@index([organizationId, status])
@@ -535,6 +542,7 @@ model Contract {
   values       ContractValue[]
   signatures   ContractSignature[]
   documentLinks ContractDocumentLink[]
+  documents    Document[]
 
   @@unique([organizationId, contractNumber])
   @@index([organizationId, status])
@@ -635,26 +643,235 @@ model ContractSignature {
   @@map("contract_signatures")
 }
 
-/// Contract-Document link (deferred to Phase 4 but the model is here for FK).
-/// Polymorphic-style: stores the document_id as a string (Phase 4 will add
-/// the Document model). For now this is a forward-compatible placeholder.
+/// Contract-Document link. Connects a contract to its related documents
+/// (source draft, signed copy, amendments, exhibits).
 model ContractDocumentLink {
   id              String   @id @default(uuid())
   contractId      String   @map("contract_id")
   organizationId  String   @map("organization_id")
-  /// Reference to a Document (Phase 4). Stored as string for now.
   documentId      String   @map("document_id")
   /// Type of link: 'source', 'signed_copy', 'amendment', 'exhibit'.
   linkType        String   @map("link_type")
   createdAt       DateTime @default(now()) @map("created_at")
 
   contract      Contract      @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  document      Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
   organization  Organization  @relation(fields: [organizationId], references: [id])
 
   @@unique([contractId, documentId, linkType])
   @@index([contractId])
+  @@index([documentId])
   @@index([organizationId])
   @@map("contract_document_links")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Documents & Templates (Phase 4)
+// ═══════════════════════════════════════════════════════════════
+
+/// Document — top-level metadata for a managed document. Binary content
+/// lives in S3/MinIO via signed URLs (ADR-004). Immutable once approved:
+/// changes create a new DocumentVersion row, never overwrite the existing one.
+model Document {
+  id              String         @id @default(uuid())
+  organizationId  String         @map("organization_id")
+  /// Optional link to a contract, matter, or legal request.
+  contractId      String?        @map("contract_id")
+  matterId        String?        @map("matter_id")
+  legalRequestId  String?        @map("legal_request_id")
+  /// Stable identifier across versions (e.g., "NDA-Acme-2026").
+  /// The Document row is the logical document; DocumentVersion rows are
+  /// the actual revisions.
+  documentNumber  String         @map("document_number")
+  title           String
+  titleEn         String?        @map("title_en")
+  description     String?
+  /// Document type: 'contract_draft', 'signed_contract', 'exhibit',
+  /// 'evidence', 'correspondence', 'memo', 'other'.
+  type            String
+  /// Current status of the document (7-state machine).
+  status          DocumentStatus @default(draft)
+  classification  ClassificationLevel @default(internal)
+  /// MIME type of the latest version (e.g., 'application/vnd.openxmlformats-officedocument.wordprocessingml.document').
+  mimeType        String?        @map("mime_type")
+  /// Size in bytes of the latest version's binary.
+  sizeBytes       Int?           @map("size_bytes")
+  /// SHA-256 hash of the latest version's binary content (integrity check).
+  contentHash     String?        @map("content_hash")
+  /// Virus scan status of the latest version.
+  virusScanStatus VirusScanStatus @default(pending) @map("virus_scan_status")
+  /// Latest version number (1, 2, 3, ...). Incremented on each new version.
+  currentVersion  Int            @default(1) @map("current_version")
+  uploadedBy      String         @map("uploaded_by")
+  approvedBy      String?        @map("approved_by")
+  approvedAt      DateTime?      @map("approved_at")
+  /// If true, prevents permanent deletion (Legal Hold per Rule 10).
+  legalHold       Boolean        @default(false) @map("legal_hold")
+  /// Retention policy: when the document can be permanently deleted.
+  retentionUntil  DateTime?      @map("retention_until")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  deletedAt       DateTime?      @map("deleted_at")
+  deletedBy       String?        @map("deleted_by")
+  rowVersion      Int             @default(0) @map("row_version")
+
+  organization Organization     @relation(fields: [organizationId], references: [id])
+  contract     Contract?         @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  matter       Matter?           @relation(fields: [matterId], references: [id], onDelete: SetNull)
+  legalRequest LegalRequest?    @relation(fields: [legalRequestId], references: [id], onDelete: SetNull)
+  versions     DocumentVersion[]
+  contractDocumentLinks ContractDocumentLink[]
+
+  @@unique([organizationId, documentNumber])
+  @@index([organizationId, status])
+  @@index([contractId])
+  @@index([matterId])
+  @@index([legalRequestId])
+  @@index([uploadedBy])
+  @@index([status])
+  @@map("documents")
+}
+
+/// Document Version — immutable revision of a document. Each version
+/// stores its own S3 key + content hash. Approved versions CANNOT be
+/// modified (Rule 12: immutable approved document versions).
+model DocumentVersion {
+  id              String         @id @default(uuid())
+  documentId      String         @map("document_id")
+  organizationId  String         @map("organization_id")
+  versionNumber   Int            @map("version_number")
+  /// S3 object key (bucket + key). Signed URL generated on demand.
+  storageKey      String         @map("storage_key")
+  /// Original filename from upload.
+  filename        String
+  mimeType        String         @map("mime_type")
+  sizeBytes       Int            @map("size_bytes")
+  /// SHA-256 hash of the binary content (integrity verification).
+  contentHash     String         @map("content_hash")
+  /// What changed in this version vs the previous one (free text).
+  changeSummary   String?        @map("change_summary")
+  /// Who uploaded/created this version.
+  uploadedBy      String         @map("uploaded_by")
+  /// Whether this version has been approved (approved versions are immutable).
+  approvedBy      String?        @map("approved_by")
+  approvedAt      DateTime?      @map("approved_at")
+  virusScanStatus VirusScanStatus @default(pending) @map("virus_scan_status")
+  createdAt       DateTime       @default(now()) @map("created_at")
+
+  document Document         @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId])
+  @@index([organizationId])
+  @@index([contentHash])
+  @@map("document_versions")
+}
+
+/// Template — DOCX template that can be filled from request/matter/contract
+/// data using docxtemplater. Stored in S3 like documents.
+model Template {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  templateCode    String   @map("template_code")
+  name            String
+  nameEn          String?  @map("name_en")
+  description     String?
+  /// Type of template: 'contract', 'letter', 'memo', 'notice', 'clause_set'.
+  type            String
+  /// S3 object key for the DOCX template file.
+  storageKey      String   @map("storage_key")
+  filename        String
+  /// JSON schema describing the variables the template expects.
+  /// Example: { "contract_title": "string", "effective_date": "date", "party_name": "string" }
+  variablesSchema Json?    @map("variables_schema") @db.JsonB
+  /// Default values for some variables (JSON object).
+  defaultValues   Json?    @map("default_values") @db.JsonB
+  /// Country code this template is designed for (for locale formatting).
+  countryCode     String?  @map("country_code")
+  /// Locale: 'ar', 'en', or 'ar,en' for bilingual.
+  locale          String   @default("ar")
+  /// Version of the template file (incremented when the DOCX is updated).
+  version         Int      @default(1)
+  isActive        Boolean  @default(true) @map("is_active")
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+  deletedBy       String?  @map("deleted_by")
+  rowVersion      Int      @default(0) @map("row_version")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  clauses       TemplateClause[]
+
+  @@unique([organizationId, templateCode])
+  @@index([organizationId, type])
+  @@index([organizationId, isActive])
+  @@map("templates")
+}
+
+/// Clause — reusable clause text that can be inserted into templates.
+/// Each clause has AR + EN text and a category for organization.
+model Clause {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  code            String
+  title           String
+  titleEn         String?  @map("title_en")
+  /// Category: 'boilerplate', 'termination', 'confidentiality', 'payment', etc.
+  category        String
+  /// Clause body in Arabic (or primary language).
+  bodyText        String   @map("body_text")
+  /// Clause body in English (or secondary language).
+  bodyTextEn      String?  @map("body_text_en")
+  /// Optional variables this clause uses (JSON array of variable names).
+  variables       Json?    @db.JsonB
+  /// Country code this clause is designed for.
+  countryCode     String?  @map("country_code")
+  /// Whether this clause is currently active.
+  isActive        Boolean  @default(true) @map("is_active")
+  /// Version of the clause text (incremented on edits).
+  version         Int      @default(1)
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+  deletedBy       String?  @map("deleted_by")
+  rowVersion      Int      @default(0) @map("row_version")
+
+  organization Organization   @relation(fields: [organizationId], references: [id])
+  templateLinks TemplateClause[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, category])
+  @@index([organizationId, isActive])
+  @@map("clauses")
+}
+
+/// Template-Clause link — many-to-many between templates and clauses.
+/// Each link specifies where in the template the clause should be inserted
+/// (via a placeholder variable name).
+model TemplateClause {
+  id              String   @id @default(uuid())
+  templateId      String   @map("template_id")
+  clauseId        String   @map("clause_id")
+  organizationId  String   @map("organization_id")
+  /// The variable name in the template DOCX that this clause fills.
+  /// Example: {clause_termination} in the template → this clause's body text.
+  placeholderName String   @map("placeholder_name")
+  /// Order in which clauses are inserted (for multi-clause placeholders).
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  template      Template      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  clause        Clause        @relation(fields: [clauseId], references: [id], onDelete: Cascade)
+  organization  Organization  @relation(fields: [organizationId], references: [id])
+
+  @@unique([templateId, clauseId, placeholderName])
+  @@index([templateId])
+  @@index([clauseId])
+  @@index([organizationId])
+  @@map("template_clauses")
 }
 
 // ═══════════════════════════════════════════════════════════════
