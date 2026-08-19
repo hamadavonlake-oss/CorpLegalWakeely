@@ -26,16 +26,23 @@
     "db:studio": "prisma studio --schema=prisma/schema.prisma"
   },
   "devDependencies": {
-    "turbo": "^2.4.4",
-    "typescript": "^5.7.3",
-    "prettier": "^3.5.3",
-    "eslint": "^9.22.0",
+    "@types/passport-jwt": "^4.0.1",
     "@typescript-eslint/eslint-plugin": "^8.26.1",
     "@typescript-eslint/parser": "^8.26.1",
-    "eslint-config-prettier": "^10.1.1"
+    "eslint": "^9.22.0",
+    "eslint-config-prettier": "^10.1.1",
+    "prettier": "^3.5.3",
+    "turbo": "^2.4.4",
+    "typescript": "^5.7.3"
   },
   "packageManager": "npm@11.16.0",
   "engines": {
     "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@nestjs/jwt": "^11.0.2",
+    "@nestjs/passport": "^11.0.5",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1"
   }
 }

@@ -2,16 +2,20 @@ import { Injectable, CanActivate, ExecutionContext, Logger } from '@nestjs/commo
 import type { Request } from 'express';
 import type { TenantContext, RoleCode } from '@glo/shared';
 
-/** Augment Express Request with tenant context */
+/** JWT payload shape attached by JwtAuthGuard */
+interface JwtPayload {
+  sub: string;
+  organizationId: string;
+  email: string;
+  roles: RoleCode[];
+  mfaEnabled: boolean;
+}
+
+/** Augment Express Request */
 declare global {
   namespace Express {
     interface Request {
-      user?: {
-        sub: string;
-        organizationId: string;
-        roles: RoleCode[];
-        sessionId?: string;
-      };
+      user?: JwtPayload;
       tenantContext?: TenantContext;
     }
   }
@@ -19,12 +23,9 @@ declare global {
 
 /**
  * TenantGuard extracts organizationId / userId / roles from the JWT payload
- * (attached by an auth guard in future phases) and sets `request.tenantContext`.
+ * (attached by JwtAuthGuard) and sets `request.tenantContext`.
  *
- * Phase 0 behaviour:
- * - /health endpoint is always allowed through without tenant context.
- * - For all other routes, a warning is logged if no user is present,
- *   but the request is still allowed (auth not yet implemented).
+ * /health endpoint is always allowed through without tenant context.
  */
 @Injectable()
 export class TenantGuard implements CanActivate {
@@ -46,12 +47,11 @@ export class TenantGuard implements CanActivate {
       return true;
     }
 
-    const { sub: userId, organizationId, roles, sessionId } = request.user;
+    const { sub: userId, organizationId, roles } = request.user;
     request.tenantContext = {
       organizationId,
       userId,
       roles,
-      sessionId,
     };
 
     return true;

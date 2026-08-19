@@ -1,21 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import { HealthIndicator, HealthIndicatorResult, HealthCheckError } from '@nestjs/terminus';
+import { PrismaService } from '../database/prisma.service';
 import type { ServiceHealth } from '@glo/shared';
 
 /**
- * Prisma health indicator.
- *
- * In Phase 0 this uses a stub implementation.
- * Once the PrismaModule is wired (Phase 1+), inject PrismaService
- * and replace the stub with a real SELECT 1 query.
+ * Prisma health indicator — runs SELECT 1 against the database.
  */
 @Injectable()
 export class PrismaHealthIndicator extends HealthIndicator {
-  async isHealthy(key: string): Promise<HealthIndicatorResult & { serviceHealth?: ServiceHealth }> {
+  constructor(private readonly prisma: PrismaService) {
+    super();
+  }
+
+  async isHealthy(
+    key: string,
+  ): Promise<HealthIndicatorResult & { serviceHealth?: ServiceHealth }> {
     const start = Date.now();
     try {
-      // Stub: in Phase 1+ replace with:
-      //   await this.prisma.$queryRaw`SELECT 1`;
+      await this.prisma.$queryRawUnsafe('SELECT 1');
       const latencyMs = Date.now() - start;
       return {
         [key]: { status: 'up' },
@@ -28,7 +30,7 @@ export class PrismaHealthIndicator extends HealthIndicator {
         [key]: { status: 'down' },
         serviceHealth: { status: 'down', latencyMs, error: msg },
       };
-      throw new HealthCheckError('Prisma health check failed', result);
+      throw new HealthCheckError('Database health check failed', result);
     }
   }
 }

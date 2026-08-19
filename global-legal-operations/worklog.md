@@ -107,6 +107,32 @@ Work Log:
 - npm warnings about shamefully-hoist (cosmetic, will be addressed)
 
 Stage Summary:
-- Phase 0 is COMPLETE
-- All builds green, all tests green
+- Phase 0 builds and tests are green
+- Docker verification deferred (see 0-12)
 - Ready for Phase 1 (Auth & Organizations)
+
+---
+Task ID: 0-12
+Agent: main
+Task: Phase 0 closure - Docker documentation and smoke test
+
+Work Log:
+- Docker was NOT available in the execution environment
+- Created docker-smoke-test.sh for future verification
+- Added production warning to .env.example
+
+Docker لم يكن متاحاً في بيئة التنفيذ، لذلك لم يتم التحقق من:
+- تشغيل PostgreSQL.
+- تشغيل Redis.
+- تشغيل MinIO.
+- تشغيل Gotenberg.
+- تشغيل API وWeb معاً داخل Compose.
+- صحة الشبكات الداخلية.
+- صحة health checks بين الخدمات.
+- persistence volumes.
+- إعادة التشغيل بعد توقف خدمة.
+
+Stage Summary:
+- docker-smoke-test.sh ready at infrastructure/scripts/docker-smoke-test.sh
+- .env.example updated with production warning
+- Phase 0 FULLY CLOSED pending Docker verification in proper environment
