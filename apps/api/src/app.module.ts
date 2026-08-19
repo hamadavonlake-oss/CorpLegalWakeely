@@ -1,0 +1,28 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { PrismaModule } from './database/prisma.module';
+import { AuthModule } from './identity/auth/auth.module';
+import { OrganizationsModule } from './organizations/organizations.module';
+import { CountryPacksModule } from './country-packs/country-packs.module';
+import { HealthModule } from './health/health.module';
+import { AuditModule } from './audit/audit.module';
+import { LegalRequestsModule } from './requests/legal-requests.module';
+import { MattersModule } from './matters/matters.module';
+import { ConflictChecksModule } from './conflict-checks/conflict-checks.module';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    PrismaModule,
+    AuthModule,
+    OrganizationsModule,
+    CountryPacksModule,
+    HealthModule,
+    // Phase 2 — Legal Operations
+    AuditModule,
+    LegalRequestsModule,
+    MattersModule,
+    ConflictChecksModule,
+  ],
+})
+export class AppModule {}
