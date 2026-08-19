@@ -1,0 +1,41 @@
+{
+  "name": "global-legal-operations",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Global Legal Operations Platform - MVP",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "turbo run dev --filter=@glo/api",
+    "dev:web": "turbo run dev --filter=@glo/web",
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "build:api": "turbo run build --filter=@glo/api",
+    "build:web": "turbo run build --filter=@glo/web",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
+    "db:generate": "prisma generate --schema=prisma/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema=prisma/schema.prisma",
+    "db:push": "prisma db push --schema=prisma/schema.prisma",
+    "db:seed": "tsx prisma/seed/index.ts",
+    "db:studio": "prisma studio --schema=prisma/schema.prisma"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.4",
+    "typescript": "^5.7.3",
+    "prettier": "^3.5.3",
+    "eslint": "^9.22.0",
+    "@typescript-eslint/eslint-plugin": "^8.26.1",
+    "@typescript-eslint/parser": "^8.26.1",
+    "eslint-config-prettier": "^10.1.1"
+  },
+  "packageManager": "npm@11.16.0",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

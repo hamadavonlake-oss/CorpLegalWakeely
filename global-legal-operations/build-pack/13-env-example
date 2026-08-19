@@ -1,0 +1,14 @@
+NODE_ENV=development
+DATABASE_URL=postgresql://legalops:legalops@postgres:5432/legalops
+REDIS_URL=redis://redis:6379
+S3_ENDPOINT=http://minio:9000
+S3_BUCKET=legalops
+S3_ACCESS_KEY=change-me
+S3_SECRET_KEY=change-me
+JWT_ISSUER=http://keycloak:8080
+JWT_AUDIENCE=legalops
+APP_BASE_URL=http://localhost:3000
+API_BASE_URL=http://localhost:3001
+DEFAULT_LOCALE=ar-JO
+DEFAULT_TIMEZONE=Asia/Amman
+DEFAULT_CURRENCY=JOD

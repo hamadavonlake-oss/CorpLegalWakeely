@@ -1,0 +1,141 @@
+version: '3.8'
+
+services:
+  # ─── PostgreSQL ───
+  postgres:
+    image: postgres:16-alpine
+    container_name: glo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: legalops
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-legalops_dev_password}
+      POSTGRES_DB: legalops
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U legalops -d legalops']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis ───
+  redis:
+    image: redis:7-alpine
+    container_name: glo-redis
+    restart: unless-stopped
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+  # ─── MinIO (S3-compatible) ───
+  minio:
+    image: minio/minio:latest
+    container_name: glo-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin_secret}
+    ports:
+      - '${MINIO_API_PORT:-9000}:9000'
+      - '${MINIO_CONSOLE_PORT:-9001}:9001'
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: server /data --console-address ':9001'
+
+  # ─── Gotenberg (PDF/DOCX conversion) ───
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    container_name: glo-gotenberg
+    restart: unless-stopped
+    ports:
+      - '${GOTENBERG_PORT:-3000}:3000'
+    environment:
+      GOTENBERG_API_TIMEOUT: '30s'
+      GOTENBERG_MAX_CONVERSIONS: '10'
+      GOTENBERG_DISABLE_ROUTES: '/health'
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/health']
+      interval: 15s
+      timeout: 10s
+      retries: 3
+    tmpfs:
+      - /tmp/gotenberg:noexec,nosuid,size=500m
+
+  # ─── NestJS API ───
+  api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.api
+    container_name: glo-api
+    restart: unless-stopped
+    ports:
+      - '${API_PORT:-3001}:3001'
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: postgresql://legalops:${POSTGRES_PASSWORD:-legalops_dev_password}@postgres:5432/legalops
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: ${S3_BUCKET:-legalops}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin_secret}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_FORCE_PATH_STYLE: 'true'
+      GOTENBERG_URL: http://gotenberg:3000
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-30d}
+      MFA_ISSUER: ${MFA_ISSUER:-GlobalLegalOperations}
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-104857600}
+      SSE_ENABLED: 'true'
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:3001}
+      PORT: '3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      gotenberg:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3001/api/v1/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── Next.js Web ───
+  web:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.web
+    container_name: glo-web
+    restart: unless-stopped
+    ports:
+      - '${WEB_PORT:-3000}:3000'
+    environment:
+      NEXT_PUBLIC_API_URL: ${API_BASE_URL:-http://localhost:3001}
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
