@@ -50,6 +50,16 @@ export class AuthController {
       dto.password,
     );
 
+    if (!identity) {
+      return {
+        success: false,
+        error: {
+          code: ERROR_CODES.UNAUTHORIZED,
+          message: 'Invalid credentials',
+        },
+      };
+    }
+
     if (identity.mfaEnabled) {
       return {
         success: true,

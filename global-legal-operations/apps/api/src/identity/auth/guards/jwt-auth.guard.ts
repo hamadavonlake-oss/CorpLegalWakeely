@@ -10,7 +10,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
    * Expired tokens get TOKEN_EXPIRED, other JWT errors get INVALID_TOKEN,
    * and missing tokens get UNAUTHORIZED.
    */
-  handleRequest<TUser = unknown>(
+  override handleRequest<TUser = unknown>(
     err: Error | null,
     user: TUser | false,
     info: Error | undefined,

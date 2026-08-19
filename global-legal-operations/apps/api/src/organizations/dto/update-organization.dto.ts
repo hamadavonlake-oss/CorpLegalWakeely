@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MinLength, MaxLength, Matches } from 'class-validator';
+import { IsString, IsOptional, IsInt, MinLength, MaxLength, Matches } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateOrganizationDto {
@@ -25,4 +25,9 @@ export class UpdateOrganizationDto {
     message: 'slug must contain only lowercase letters, numbers, and hyphens',
   })
   slug?: string;
+
+  @ApiPropertyOptional({ example: 0, description: 'Current row version for optimistic locking' })
+  @IsOptional()
+  @IsInt()
+  rowVersion?: number;
 }

@@ -2,23 +2,13 @@ import { Injectable, CanActivate, ExecutionContext, Logger } from '@nestjs/commo
 import type { Request } from 'express';
 import type { TenantContext, RoleCode } from '@glo/shared';
 
-/** JWT payload shape attached by JwtAuthGuard */
-interface JwtPayload {
+/** JWT payload shape returned by JwtStrategy and attached by Passport */
+interface JwtUserPayload {
   sub: string;
   organizationId: string;
   email: string;
   roles: RoleCode[];
   mfaEnabled: boolean;
-}
-
-/** Augment Express Request */
-declare global {
-  namespace Express {
-    interface Request {
-      user?: JwtPayload;
-      tenantContext?: TenantContext;
-    }
-  }
 }
 
 /**
@@ -40,15 +30,23 @@ export class TenantGuard implements CanActivate {
       return true;
     }
 
-    if (!request.user) {
+    const user = request.user as JwtUserPayload | undefined;
+
+    // If tenantContext already set (e.g., by middleware), don't overwrite
+    const reqAny = request as unknown as Record<string, unknown>;
+    if (reqAny.tenantContext) {
+      return true;
+    }
+
+    if (!user) {
       this.logger.warn(
         `No user context on ${request.method} ${path} – auth not yet implemented, allowing through`,
       );
       return true;
     }
 
-    const { sub: userId, organizationId, roles } = request.user;
-    request.tenantContext = {
+    const { sub: userId, organizationId, roles } = user;
+    (request as Request & { tenantContext?: TenantContext }).tenantContext = {
       organizationId,
       userId,
       roles,

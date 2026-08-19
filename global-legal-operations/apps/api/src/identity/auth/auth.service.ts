@@ -215,9 +215,7 @@ export class AuthService implements AuthProvider {
     }
 
     // Verify password with Argon2id
-    const valid = await argon2.verify(user.passwordHash, password, {
-      type: argon2.argon2id,
-    });
+    const valid = await argon2.verify(user.passwordHash, password);
 
     if (!valid) {
       await this.handleFailedLogin(user.id, user.failedLoginCount);
@@ -484,7 +482,7 @@ export class AuthService implements AuthProvider {
 
   private parseTtlToSeconds(ttl: string): number {
     const match = ttl.match(/^(\d+)([smhd])$/);
-    if (!match) return 900; // default 15m
+    if (!match?.[1] || !match[2]) return 900; // default 15m
     const value = parseInt(match[1], 10);
     const unit = match[2];
     switch (unit) {
