@@ -62,7 +62,7 @@ export default function RegisterPage() {
             {error && <p className="mb-4 text-sm text-[var(--destructive)]">{error}</p>}
             <Button type="submit" className="w-full" loading={loading}>Create Account</Button>
             <p className="mt-4 text-center text-sm text-[var(--muted-foreground)]">
-              Already have an account? <a href="/login" className="text-[var(--primary)] hover:underline">Sign in</a>
+              Already have an account? <a href="/en/login" className="text-[var(--primary)] hover:underline">Sign in</a>
             </p>
           </form>
         </CardContent>

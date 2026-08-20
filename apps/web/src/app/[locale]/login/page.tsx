@@ -61,7 +61,7 @@ export default function LoginPage() {
               {error && <p className="mb-4 text-sm text-[var(--destructive)]">{error}</p>}
               <Button type="submit" className="w-full" loading={loading}>Sign In</Button>
               <p className="mt-4 text-center text-sm text-[var(--muted-foreground)]">
-                Don&apos;t have an account? <a href="/register" className="text-[var(--primary)] hover:underline">Register</a>
+                Don&apos;t have an account? <a href="/en/register" className="text-[var(--primary)] hover:underline">Register</a>
               </p>
             </form>
           ) : (
