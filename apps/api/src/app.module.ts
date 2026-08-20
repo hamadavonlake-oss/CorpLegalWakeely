@@ -18,6 +18,8 @@ import { ApprovalsModule } from './approvals/approvals.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SearchModule } from './search/search.module';
 import { DeadlinesModule } from './deadlines/deadlines.module';
+import { ExportModule } from './export/export.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -46,6 +48,9 @@ import { DeadlinesModule } from './deadlines/deadlines.module';
     // Phase 7 — Search & Deadlines
     SearchModule,
     DeadlinesModule,
+    // Phase 8 — Export & Webhooks
+    ExportModule,
+    WebhooksModule,
   ],
 })
 export class AppModule {}

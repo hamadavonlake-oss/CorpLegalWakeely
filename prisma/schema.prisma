@@ -209,6 +209,8 @@ model Organization {
   notifications  Notification[]
   notificationPreferences NotificationPreference[]
   deadlines      Deadline[]
+  webhooks       Webhook[]
+  webhookDeliveries WebhookDelivery[]
 
   @@map("organizations")
 }
@@ -1203,6 +1205,95 @@ model Deadline {
   @@index([organizationId, dueDate])
   @@index([assignedTo])
   @@map("deadlines")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Webhooks (Phase 8)
+// ═══════════════════════════════════════════════════════════════
+//
+// Per ADR-011 / build-pack/02-mvp-prd.md:
+// - HMAC-SHA256 signed webhooks
+// - Retry with exponential backoff (5 retries max)
+// - Dead-letter queue for permanently failed deliveries
+// - SSRF prevention (block private IP ranges)
+
+/// Webhook — a registered webhook endpoint that receives event notifications.
+/// Each webhook subscribes to specific event types and has a secret used
+/// to sign the payload with HMAC-SHA256.
+model Webhook {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  name            String
+  nameEn          String?  @map("name_en")
+  /// The URL to deliver webhooks to (must be HTTPS in production).
+  url             String
+  /// HMAC-SHA256 secret used to sign payloads. Stored hashed (Argon2id).
+  /// The plaintext secret is only shown once at creation time.
+  secretHash      String   @map("secret_hash")
+  /// Which event types this webhook subscribes to (JSON array).
+  /// Empty array = all events.
+  events          Json     @default("[]") @db.JsonB
+  /// Whether the webhook is currently active.
+  isActive        Boolean  @default(true) @map("is_active")
+  /// Whether to verify SSL certificates (always true in production).
+  verifySsl       Boolean  @default(true) @map("verify_ssl")
+  /// Optional: shared secret header name (default: X-Webhook-Signature).
+  secretHeaderName String? @map("secret_header_name")
+  createdBy        String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+  deletedBy       String?  @map("deleted_by")
+  rowVersion      Int      @default(0) @map("row_version")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  deliveries   WebhookDelivery[]
+
+  @@index([organizationId, isActive])
+  @@map("webhooks")
+}
+
+/// WebhookDelivery — a single delivery attempt for a webhook.
+/// Tracks the request/response, retry count, and status.
+/// After max retries (5), the delivery is moved to dead-letter status.
+model WebhookDelivery {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  webhookId       String   @map("webhook_id")
+  /// The event type (e.g. 'contract.created', 'approval.completed').
+  eventType       String   @map("event_type")
+  /// The payload sent (JSON).
+  payload         Json     @db.JsonB
+  /// The HMAC-SHA256 signature sent with this delivery.
+  signature       String
+  /// Delivery status: 'pending', 'success', 'failed', 'dead_letter'.
+  status          String   @default("pending")
+  /// HTTP response status code (if delivered).
+  responseStatus  Int?     @map("response_status")
+  /// Response body (truncated to 1000 chars).
+  responseBody    String?  @map("response_body") @db.VarChar(1000)
+  /// Error message (if failed).
+  errorMessage    String?  @map("error_message")
+  /// Number of delivery attempts (0 = not yet attempted).
+  attemptCount    Int      @default(0) @map("attempt_count")
+  /// Max attempts before dead-lettering (default 5).
+  maxAttempts     Int      @default(5) @map("max_attempts")
+  /// Next retry time (exponential backoff).
+  nextRetryAt     DateTime? @map("next_retry_at")
+  /// When the delivery was first attempted.
+  firstAttemptAt  DateTime? @map("first_attempt_at")
+  /// When the delivery was completed (success or dead-lettered).
+  completedAt     DateTime? @map("completed_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  webhook     Webhook     @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, status])
+  @@index([webhookId, status])
+  @@index([nextRetryAt])
+  @@index([eventType])
+  @@map("webhook_deliveries")
 }
 
 // ═══════════════════════════════════════════════════════════════
