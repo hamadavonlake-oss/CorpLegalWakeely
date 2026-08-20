@@ -14,7 +14,6 @@ interface Matter { id: string; matterNumber: string; title: string; titleEn?: st
 interface Contract { id: string; contractNumber: string; title: string; titleEn?: string; status: string; priority: string; type?: string; totalValue?: string; totalCurrency?: string; createdAt: string; }
 
 export default function DashboardPage() {
-  const t = useTranslations('nav');
   const tc = useTranslations('common');
   const locale = useLocale();
   const { user } = useAuthStore();

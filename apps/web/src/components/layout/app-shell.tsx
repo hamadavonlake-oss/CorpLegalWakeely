@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
+import { NotificationBell } from '@/components/notifications/notification-bell';
 
 const PUBLIC_PATHS = ['/login', '/register'];
 
@@ -37,6 +38,10 @@ export function AppShell({ children, locale }: { children: React.ReactNode; loca
     { href: `/${locale}/contracts`, label: t('contracts'), icon: '📝' },
     { href: `/${locale}/documents`, label: t('documents'), icon: '📄' },
     { href: `/${locale}/templates`, label: t('templates'), icon: '📑' },
+    { href: `/${locale}/search`, label: t('search'), icon: '🔍' },
+    { href: `/${locale}/audit`, label: t('audit'), icon: '📜' },
+    { href: `/${locale}/admin/settings`, label: t('settings'), icon: '⚙️' },
+    { href: `/${locale}/admin/users`, label: t('organization'), icon: '👥' },
   ];
 
   const handleLogout = async () => {
@@ -68,7 +73,15 @@ export function AppShell({ children, locale }: { children: React.ReactNode; loca
             <a href={`/${locale === 'ar' ? 'en' : 'ar'}`} className={`rounded px-3 py-1 text-sm ${locale === 'en' ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'text-[var(--muted-foreground)]'}`}>English</a>
           </div>
           <div className="flex items-center gap-4">
-            {user && <span className="text-sm text-[var(--muted-foreground)]">{user.displayName || user.email}</span>}
+            {isAuthenticated && <NotificationBell />}
+            {user && (
+              <a
+                href={`/${locale}/profile`}
+                className="text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:underline"
+              >
+                {user.displayName || user.email}
+              </a>
+            )}
             <Button variant="outline" size="sm" onClick={handleLogout}>{locale === 'ar' ? 'خروج' : 'Logout'}</Button>
           </div>
         </header>
