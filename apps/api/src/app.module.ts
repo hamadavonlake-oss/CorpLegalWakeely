@@ -15,6 +15,7 @@ import { DocumentsModule } from './documents/documents.module';
 import { TemplatesModule } from './templates/templates.module';
 import { ClausesModule } from './clauses/clauses.module';
 import { ApprovalsModule } from './approvals/approvals.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -38,6 +39,8 @@ import { ApprovalsModule } from './approvals/approvals.module';
     ClausesModule,
     // Phase 5 — Approvals
     ApprovalsModule,
+    // Phase 6 — Notifications
+    NotificationsModule,
   ],
 })
 export class AppModule {}

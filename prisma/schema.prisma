@@ -206,6 +206,8 @@ model Organization {
   approvalRuleSteps ApprovalRuleStep[]
   approvalInstances ApprovalInstance[]
   approvalInstanceSteps ApprovalInstanceStep[]
+  notifications  Notification[]
+  notificationPreferences NotificationPreference[]
 
   @@map("organizations")
 }
@@ -1074,6 +1076,86 @@ model ApprovalInstanceStep {
   @@index([assignedTo])
   @@index([ruleStepId])
   @@map("approval_instance_steps")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Notifications (Phase 6)
+// ═══════════════════════════════════════════════════════════════
+//
+// Per ADR-011 / build-pack/02-mvp-prd.md:
+// - In-app notifications via Server-Sent Events (SSE)
+// - Persistent notification storage (survives reloads)
+// - Polling fallback for clients that can't use SSE
+// - Email notification stubs (real email deferred to Phase 8)
+// - User notification preferences
+
+/// Notification — a single in-app notification for a user.
+/// Persisted in PostgreSQL; delivered via SSE or polling.
+model Notification {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  /// Who the notification is for.
+  userId          String   @map("user_id")
+  /// Notification type (drives icon + routing in UI).
+  /// Examples: 'request.submitted', 'request.assigned', 'matter.created',
+  /// 'matter.status_changed', 'approval.needed', 'approval.decision',
+  /// 'contract.status_changed', 'document.uploaded', 'deadline.approaching'
+  type            String
+  /// Short title (AR or EN based on user's locale).
+  title           String
+  /// Longer body text (1-2 sentences).
+  body            String
+  /// Severity: 'info', 'success', 'warning', 'error'.
+  severity        String   @default("info")
+  /// Optional link to navigate to when clicked (e.g. '/matters/mtr-1').
+  actionUrl       String?  @map("action_url")
+  /// Optional related object (for grouping/filters).
+  objectType      String?  @map("object_type")
+  objectId        String?  @map("object_id")
+  /// Whether the notification has been read by the user.
+  readAt          DateTime? @map("read_at")
+  /// When the notification was created.
+  createdAt       DateTime @default(now()) @map("created_at")
+  /// Optional: when the notification should be delivered (for scheduled reminders).
+  scheduledFor    DateTime? @map("scheduled_for")
+  /// Delivery status: 'pending', 'delivered', 'failed'.
+  deliveryStatus  String   @default("delivered") @map("delivery_status")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, userId, readAt])
+  @@index([userId, createdAt])
+  @@index([organizationId, type])
+  @@index([scheduledFor])
+  @@map("notifications")
+}
+
+/// NotificationPreference — per-user preferences for which notifications
+/// they want to receive, and via which channels (in-app, email).
+model NotificationPreference {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  userId          String   @unique @map("user_id")
+  /// Master toggle. If false, no notifications at all.
+  inAppEnabled    Boolean  @default(true) @map("in_app_enabled")
+  /// Email notifications (Phase 8 will wire real email).
+  emailEnabled    Boolean  @default(false) @map("email_enabled")
+  /// JSON object of enabled notification types.
+  /// Example: { "request.submitted": true, "approval.needed": true, "deadline.approaching": true }
+  /// If a type is missing, it defaults to enabled.
+  enabledTypes    Json?    @map("enabled_types") @db.JsonB
+  /// Digest frequency: 'instant', 'hourly', 'daily', 'weekly'.
+  digestFrequency String   @default("instant") @map("digest_frequency")
+  /// Quiet hours: don't send notifications between these times.
+  /// Format: { "start": "22:00", "end": "07:00", "timezone": "Asia/Amman" }
+  quietHours      Json?    @map("quiet_hours") @db.JsonB
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@map("notification_preferences")
 }
 
 // ═══════════════════════════════════════════════════════════════

@@ -661,3 +661,66 @@ Stage Summary:
 - Sequential + parallel approval types supported
 - Re-approval trigger integration point ready (will be called from contracts/documents update services in a follow-up)
 - Per ADR-008: sequential/parallel/delegation approvals with escalation
+
+---
+Task ID: 6-1
+Agent: main
+Task: Phase 6 — Notifications (SSE + persistent storage + email stubs + preferences)
+
+Work Log:
+- Extended prisma/schema.prisma with 2 new models:
+  - Notification (userId, type, title, body, severity, actionUrl, objectType/objectId, readAt, scheduledFor, deliveryStatus)
+  - NotificationPreference (per-user: inAppEnabled, emailEnabled, enabledTypes JSON, digestFrequency, quietHours JSON)
+- Wrote prisma/migrations/20260820040000_phase6_notifications/migration.sql:
+  - Creates 2 tables with FK constraints + CHECK constraints for severity/delivery_status/digest_frequency
+  - 4 indexes on notifications: (org, user, readAt), (user, createdAt), (org, type), (scheduledFor)
+  - Unique constraint on notification_preferences.user_id (one prefs row per user)
+  - Enables RLS + FORCE RLS on both tables
+  - Tenant isolation policies
+- Built NotificationsModule (apps/api/src/notifications/):
+  - notification-types.ts: 25 notification type constants (request/matter/contract/document/approval/deadline/system), 4 severity levels, 4 digest frequencies, default preferences
+  - notifications-event-bus.ts: in-memory pub/sub using RxJS Subject per user
+    - publish(event): pushes to user's Subject (drops silently if no SSE connection)
+    - subscribe(userId): returns Observable filtered by userId
+    - unsubscribe(userId): completes + cleans up Subject (prevents memory leaks)
+    - getActiveConnectionCount(): for monitoring
+  - email.service.ts: stub that logs email content instead of sending (Phase 8 will wire real SMTP via Nodemailer)
+  - notifications.service.ts:
+    - create(): persists notification, checks preferences (inAppEnabled + enabledTypes), pushes to SSE, sends email if enabled (fire-and-forget)
+    - createMany(): broadcast to multiple users
+    - list(): paginated, filter by unreadOnly + type
+    - getUnreadCount(): returns {unread, total}
+    - markRead / markAllRead / markUnread (idempotent on already-read)
+    - delete()
+    - getPreferences / updatePreferences (upsert with auto-create defaults)
+    - subscribeToUserStream / unsubscribeUserStream (delegates to eventBus)
+  - notifications.controller.ts:
+    - GET /notifications (list with filters)
+    - GET /notifications/unread-count
+    - GET /notifications/stream (SSE endpoint with 30s heartbeat + auto-unsubscribe on close)
+    - POST /notifications/:id/read
+    - POST /notifications/mark-all-read
+    - POST /notifications/:id/unread
+    - DELETE /notifications/:id
+    - GET /notifications/preferences
+    - PATCH /notifications/preferences
+- Wired NotificationsModule into AppModule (now imports 16 modules)
+- Extended seed data:
+  - 3 new permissions (notification.read, notification.manage, notification.preferences) — total now 66
+  - Updated all 10 role-permission mappings with Phase 6 permissions (everyone can read + manage own notifications + preferences)
+  - Added 3 sample notifications (approval.needed for lawyer, contract.status_changed for owner, matter.assigned for owner — last one already read)
+  - Added 1 sample notification preference (lawyer: emailEnabled=true, instant digest, quiet hours 22:00-07:00 Asia/Amman, 5 enabled types)
+
+Tests — 421/421 PASS across 23 suites (+40 new from Phase 5 baseline of 381):
+- notifications-event-bus.spec.ts (15 tests): publish+subscribe delivery, user-specific delivery (no cross-user leakage), silent drop on no subscriber, ordered delivery, multiple subscribers per user, unsubscribe completes stream + stops delivery, no-op on unknown user, getActiveConnectionCount tracking
+- notifications.service.spec.ts (25 tests): create (success, suppressed when inAppEnabled=false, suppressed when type disabled, delivered when type enabled, NotFound for unknown user, email sent when enabled, auto-creates default prefs), list (RLS filtering, unreadOnly filter, type filter), getUnreadCount, markRead (success + idempotent + NotFound + RLS), markAllRead (success + 0 when none unread), markUnread, delete (success + NotFound), preferences (get existing, create defaults, update fields, update enabledTypes, update quietHours), SSE delegation
+
+Stage Summary:
+- Phase 6 COMPLETE: NotificationsModule with SSE + persistent storage + email stubs + preferences
+- 2 new Prisma models, 1 migration, 8 new files (service, controller, module, event bus, email service, types, DTOs, tests), 66 total permissions
+- 421/421 tests pass, 0 TypeScript errors, all packages build
+- SSE endpoint with 30-second heartbeat (prevents proxy timeouts)
+- Polling fallback via GET /notifications (works without SSE)
+- Email stub logs content (real email deferred to Phase 8 with Nodemailer/SMTP)
+- User preferences: inAppEnabled master toggle, per-type enable/disable, digest frequency, quiet hours
+- Event bus is in-memory (works for single-instance; multi-instance needs Redis pub/sub — documented in code)

@@ -161,6 +161,10 @@ const PERMISSIONS = [
   { code: 'approval.skip', name: 'تخطي خطوة اعتماد', nameEn: 'Skip Approval Step', module: 'approvals' },
   { code: 'approval.cancel', name: 'إلغاء طلب اعتماد', nameEn: 'Cancel Approval Instance', module: 'approvals' },
   { code: 'approval.read', name: 'عرض طلبات الاعتماد', nameEn: 'Read Approval Instances', module: 'approvals' },
+  // ─── Phase 6: Notifications ──────────────────────────────────
+  { code: 'notification.read', name: 'عرض الإشعارات', nameEn: 'Read Notifications', module: 'notifications' },
+  { code: 'notification.manage', name: 'إدارة الإشعارات', nameEn: 'Manage Notifications', module: 'notifications' },
+  { code: 'notification.preferences', name: 'تفضيلات الإشعارات', nameEn: 'Manage Notification Preferences', module: 'notifications' },
 ];
 
 // ─── Role → Permission mapping ─────────────────────────────
@@ -188,6 +192,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'approval.rule.create', 'approval.rule.read', 'approval.rule.update', 'approval.rule.delete',
     'approval.submit', 'approval.decide', 'approval.delegate', 'approval.skip',
     'approval.cancel', 'approval.read',
+    // Phase 6 — notifications (everyone reads + manages own)
+    'notification.read', 'notification.manage', 'notification.preferences',
   ],
   legal_admin: [
     'organization.read', 'organization.settings',
@@ -211,6 +217,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'approval.rule.create', 'approval.rule.read', 'approval.rule.update', 'approval.rule.delete',
     'approval.submit', 'approval.decide', 'approval.delegate', 'approval.skip',
     'approval.cancel', 'approval.read',
+    // Phase 6
+    'notification.read', 'notification.manage', 'notification.preferences',
   ],
   general_counsel: [
     'organization.read',
@@ -230,6 +238,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     // Phase 5
     'approval.rule.read', 'approval.submit', 'approval.decide', 'approval.delegate',
     'approval.cancel', 'approval.read',
+    // Phase 6
+    'notification.read', 'notification.manage', 'notification.preferences',
   ],
   lawyer: [
     'organization.read', 'entity.read', 'department.read',
@@ -265,6 +275,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     // Phase 5 — contract managers can submit and decide approvals
     'approval.rule.read', 'approval.submit', 'approval.decide', 'approval.delegate',
     'approval.skip', 'approval.read',
+    // Phase 6
+    'notification.read', 'notification.manage', 'notification.preferences',
   ],
   business_requester: [
     'organization.read',
@@ -282,6 +294,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'document.read', 'document.download',
     // Phase 5 — finance is a primary approver
     'approval.decide', 'approval.read',
+    // Phase 6
+    'notification.read', 'notification.manage', 'notification.preferences',
   ],
   executive_approver: [
     'organization.read', 'audit.read',
@@ -294,6 +308,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'document.read', 'document.download',
     // Phase 5 — executives are approvers
     'approval.decide', 'approval.read',
+    // Phase 6
+    'notification.read', 'notification.manage', 'notification.preferences',
   ],
   auditor: [
     'organization.read', 'entity.read', 'department.read', 'user.read', 'audit.read',
@@ -308,6 +324,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'template.read', 'clause.read',
     // Phase 5
     'approval.read',
+    // Phase 6
+    'notification.read',
   ],
   platform_admin: [
     'organization.read', 'organization.update', 'organization.settings',
@@ -331,6 +349,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'approval.rule.create', 'approval.rule.read', 'approval.rule.update', 'approval.rule.delete',
     'approval.submit', 'approval.decide', 'approval.delegate', 'approval.skip',
     'approval.cancel', 'approval.read',
+    // Phase 6
+    'notification.read', 'notification.manage', 'notification.preferences',
   ],
 };
 
@@ -1013,6 +1033,79 @@ async function main() {
         console.log(`    → Approval instance created for ${contract2.contractNumber}`);
       }
     }
+  }
+
+  // 14. Phase 6 sample data — Notifications
+  console.log('  → Phase 6 sample data: Notifications');
+
+  if (owner && lawyer) {
+    // 14a. Sample notifications for the lawyer (the approver)
+    await prisma.notification.create({
+      data: {
+        organizationId: org.id,
+        userId: lawyer.id,
+        type: 'approval.needed',
+        title: 'طلب اعتماد جديد',
+        body: `العقد ${contract2?.contractNumber ?? 'CTR-0002'} بانتظار المراجعة القانونية`,
+        severity: 'warning',
+        actionUrl: `/approvals/by-object/contract/${contract2?.id ?? 'ctr-2'}`,
+        objectType: 'contract',
+        objectId: contract2?.id ?? 'ctr-2',
+        deliveryStatus: 'delivered',
+      },
+    }).catch(() => { /* already exists */ });
+
+    await prisma.notification.create({
+      data: {
+        organizationId: org.id,
+        userId: owner.id,
+        type: 'contract.status_changed',
+        title: 'تحديث حالة العقد',
+        body: `تم تغيير حالة العقد ${contract2?.contractNumber ?? 'CTR-0002'} إلى "بانتظار التوقيع"`,
+        severity: 'info',
+        actionUrl: `/contracts/${contract2?.id ?? 'ctr-2'}`,
+        objectType: 'contract',
+        objectId: contract2?.id ?? 'ctr-2',
+        deliveryStatus: 'delivered',
+      },
+    }).catch(() => { /* already exists */ });
+
+    await prisma.notification.create({
+      data: {
+        organizationId: org.id,
+        userId: owner.id,
+        type: 'matter.assigned',
+        title: 'قضية جديدة مسندة إليك',
+        body: 'تم إسناد قضية نزاع تجاري إليك للمراجعة',
+        severity: 'info',
+        actionUrl: '/matters',
+        objectType: 'matter',
+        deliveryStatus: 'delivered',
+        readAt: new Date(), // already read
+      },
+    }).catch(() => { /* already exists */ });
+
+    console.log(`    → 3 sample notifications created`);
+
+    // 14b. Sample notification preferences for the lawyer
+    await prisma.notificationPreference.create({
+      data: {
+        organizationId: org.id,
+        userId: lawyer.id,
+        inAppEnabled: true,
+        emailEnabled: true,
+        enabledTypes: {
+          'approval.needed': true,
+          'approval.decision': true,
+          'matter.assigned': true,
+          'deadline.approaching': true,
+          'contract.expiring': true,
+        },
+        digestFrequency: 'instant',
+        quietHours: { start: '22:00', end: '07:00', timezone: 'Asia/Amman' },
+      },
+    }).catch(() => { /* already exists */ });
+    console.log(`    → Lawyer notification preferences created`);
   }
 
   console.log('Seed complete.');
