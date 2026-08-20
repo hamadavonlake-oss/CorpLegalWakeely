@@ -20,13 +20,20 @@ export function AppShell({ children, locale }: { children: React.ReactNode; loca
 
   const isPublicPath = PUBLIC_PATHS.some((p) => pathname.includes(p));
 
+  // Redirect to login if not authenticated — must be in useEffect to avoid
+  // calling router.push() during SSR (which causes "location is not defined")
+  useEffect(() => {
+    if (!isAuthenticated && !isPublicPath && !isLoading) {
+      router.push(`/${locale}/login`);
+    }
+  }, [isAuthenticated, isPublicPath, isLoading, router, locale]);
+
   if (isLoading && !isAuthenticated && !isPublicPath) {
     return <div className="flex min-h-screen items-center justify-center"><div className="text-[var(--muted-foreground)]">Loading…</div></div>;
   }
 
   if (!isAuthenticated && !isPublicPath) {
-    router.push(`/${locale}/login`);
-    return null;
+    return null; // Will redirect via useEffect above
   }
 
   if (isPublicPath) return <>{children}</>;
