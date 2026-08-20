@@ -68,14 +68,30 @@ export class AuthService implements AuthProvider {
     publicKey: string;
     kid: string;
   } {
+    // 1. Check for keys provided directly as env vars (PEM content)
+    const envPrivateKey = this.config.get<string>('JWT_PRIVATE_KEY');
+    const envPublicKey = this.config.get<string>('JWT_PUBLIC_KEY');
+    if (envPrivateKey && envPublicKey) {
+      this.logger.log('Loading RSA key pair from JWT_PRIVATE_KEY / JWT_PUBLIC_KEY env vars');
+      const kid = crypto
+        .createHash('sha256')
+        .update(envPublicKey)
+        .digest('hex')
+        .substring(0, 16);
+      return { privateKey: envPrivateKey, publicKey: envPublicKey, kid };
+    }
+
+    // 2. Check for keys on disk — use JWT_KEYPAIR_DIR or fall back to /tmp/glo-jwt
+    //    (which is always writable, even in Docker containers running as non-root)
     const keyPath =
-      this.config.get<string>('JWT_PRIVATE_KEY_PATH') ??
-      path.join(process.cwd(), 'config', 'jwt');
+      this.config.get<string>('JWT_KEYPAIR_DIR') ??
+      this.config.get<string>('JWT_PRIVATE_KEY_PATH')?.replace(/\/private\.pem$/, '') ??
+      '/tmp/glo-jwt';
     const privFile = path.join(keyPath, 'private.pem');
     const pubFile = path.join(keyPath, 'public.pem');
 
     if (fs.existsSync(privFile) && fs.existsSync(pubFile)) {
-      this.logger.warn('Loading RSA key pair from disk');
+      this.logger.log('Loading RSA key pair from disk: ' + keyPath);
       const kid = crypto
         .createHash('sha256')
         .update(fs.readFileSync(pubFile, 'utf-8'))
@@ -88,10 +104,10 @@ export class AuthService implements AuthProvider {
       };
     }
 
-    // Dev-only: generate RSA key pair
+    // 3. Dev-only: generate RSA key pair in memory + try to persist to disk
     this.logger.warn(
-      'No RSA key pair found — generating a new one (dev only). '
-      + 'In production, provide JWT_PRIVATE_KEY_PATH.',
+      'No RSA key pair found — generating a new one (dev only). ' +
+        'In production, provide JWT_PRIVATE_KEY and JWT_PUBLIC_KEY env vars.',
     );
 
     const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
@@ -100,10 +116,19 @@ export class AuthService implements AuthProvider {
       privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
     });
 
-    // Ensure directory exists
-    fs.mkdirSync(keyPath, { recursive: true });
-    fs.writeFileSync(privFile, privateKey, { mode: 0o600 });
-    fs.writeFileSync(pubFile, publicKey, { mode: 0o644 });
+    // Try to persist keys to disk (may fail in read-only containers — that's OK,
+    // the in-memory keys will work for this process's lifetime)
+    try {
+      fs.mkdirSync(keyPath, { recursive: true });
+      fs.writeFileSync(privFile, privateKey, { mode: 0o600 });
+      fs.writeFileSync(pubFile, publicKey, { mode: 0o644 });
+      this.logger.log('RSA key pair persisted to: ' + keyPath);
+    } catch (err) {
+      this.logger.warn(
+        'Could not persist RSA key pair to disk (running with in-memory keys): ' +
+          (err as Error).message,
+      );
+    }
 
     const kid = crypto
       .createHash('sha256')
