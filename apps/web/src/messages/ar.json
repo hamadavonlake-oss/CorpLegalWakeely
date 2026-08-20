@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "منصة العمليات القانونية العالمية",
+    "appName": "منصة العمليات القانونية",
     "loading": "جارٍ التحميل...",
     "error": "حدث خطأ",
     "save": "حفظ",
@@ -11,27 +11,27 @@
     "next": "التالي",
     "search": "بحث",
     "noResults": "لا توجد نتائج",
-    "actions": "الإجراءات",
+    "actions": "إجراءات",
     "status": "الحالة",
     "createdAt": "تاريخ الإنشاء",
-    "updatedAt": "آخر تحديث"
+    "updatedAt": "تاريخ التحديث"
   },
   "nav": {
     "dashboard": "لوحة التحكم",
     "requests": "الطلبات القانونية",
-    "matters": "المسائل",
+    "matters": "القضايا",
     "contracts": "العقود",
     "documents": "المستندات",
     "templates": "القوالب",
-    "approvals": "الموافقات",
+    "approvals": "الاعتمادات",
     "deadlines": "المواعيد النهائية",
-    "search": "البحث",
+    "search": "بحث",
     "audit": "سجل التدقيق",
     "settings": "الإعدادات",
     "organization": "المؤسسة"
   },
   "health": {
-    "title": "حالة النظام",
+    "title": "صحة النظام",
     "status": "الحالة",
     "version": "الإصدار",
     "uptime": "وقت التشغيل",
