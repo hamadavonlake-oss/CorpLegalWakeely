@@ -35,6 +35,8 @@ export function AppShell({ children, locale }: { children: React.ReactNode; loca
     { href: `/${locale}/requests`, label: t('requests'), icon: '📋' },
     { href: `/${locale}/matters`, label: t('matters'), icon: '⚖️' },
     { href: `/${locale}/contracts`, label: t('contracts'), icon: '📝' },
+    { href: `/${locale}/documents`, label: t('documents'), icon: '📄' },
+    { href: `/${locale}/templates`, label: t('templates'), icon: '📑' },
   ];
 
   const handleLogout = async () => {
