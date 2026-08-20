@@ -1,0 +1,7 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "settings": {
+    "name": "CorpLegalWakeely",
+    "description": "Global Legal Operations Platform — multi-tenant SaaS for in-house legal teams"
+  }
+}

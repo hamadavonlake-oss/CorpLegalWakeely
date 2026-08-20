@@ -1,26 +1,40 @@
-# ─── Next.js Web Dockerfile ───
+# ─── Next.js Web Dockerfile (Phase 9-12) ───
+# Multi-stage build: deps → builder → runner
+# Updated for Phase 12: includes swr, zustand, next-intl
+
 FROM node:22-alpine AS base
 
+# ─── Stage 1: Install dependencies ───
 FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json* turbo.json .
+COPY package.json package-lock.json* turbo.json .npmrc ./
 COPY packages/shared/package.json packages/shared/
+COPY packages/config/package.json packages/config/
 COPY apps/web/package.json apps/web/
 RUN npm install --ignore-scripts
 
+# ─── Stage 2: Build ───
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npx turbo build --filter=@glo/shared --filter=@glo/web
+# Build shared first (web depends on it)
+RUN npx turbo build --filter=@glo/shared --filter=@glo/config
+# Build web with NEXT_PUBLIC_API_URL as build-time env
+ARG NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+RUN npx turbo build --filter=@glo/web
 
+# ─── Stage 3: Production runner ───
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/apps/web/.next/standalone .
+# Next.js standalone output
+COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./.next/static
+# Copy public assets if they exist
 COPY --from=builder /app/apps/web/public ./public 2>/dev/null || true
 
 USER nextjs
