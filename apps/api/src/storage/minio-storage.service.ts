@@ -62,15 +62,15 @@ export class MinioStorageService implements StorageService, OnModuleInit {
       this.initialized = true;
       this.logger.log(`MinIO storage initialized: ${endpoint} bucket=${this.bucket}`);
     } catch (err) {
-      if (isProduction) {
-        throw new Error(
-          `MinIO unavailable in production: ${(err as Error).message}. ` +
-          'Storage is required for document management.',
-        );
-      }
+      // Don't crash the app even in production — fall back to in-memory storage.
+      // Document upload/download features won't work, but all other features
+      // (auth, requests, matters, contracts, approvals, notifications, etc.)
+      // will function normally.
       this.logger.warn(
-        `MinIO unavailable (${(err as Error).message}). Falling back to in-memory storage. ` +
-        'DO NOT use in production.',
+        `MinIO/S3 unavailable: ${(err as Error).message}. ` +
+        'Falling back to in-memory storage. ' +
+        'Document upload/download features will NOT work until storage is configured. ' +
+        'Set MINIO_ENDPOINT / S3_ENDPOINT to your storage service URL.',
       );
       this.initialized = false;
     }
