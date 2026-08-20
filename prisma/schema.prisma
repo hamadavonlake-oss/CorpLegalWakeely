@@ -208,6 +208,7 @@ model Organization {
   approvalInstanceSteps ApprovalInstanceStep[]
   notifications  Notification[]
   notificationPreferences NotificationPreference[]
+  deadlines      Deadline[]
 
   @@map("organizations")
 }
@@ -1156,6 +1157,52 @@ model NotificationPreference {
 
   @@index([organizationId])
   @@map("notification_preferences")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Deadlines (Phase 7)
+// ═══════════════════════════════════════════════════════════════
+
+/// Deadline — a tracked due date for a matter, contract, or request.
+/// When a deadline is approaching (configurable reminder days before),
+/// the system sends a notification to the assigned user.
+model Deadline {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  /// What the deadline is for: 'matter', 'contract', 'request'.
+  parentType      String   @map("parent_type")
+  parentId        String   @map("parent_id")
+  /// Title of the deadline (e.g. "Filing deadline", "Response to court").
+  title           String
+  titleEn         String?  @map("title_en")
+  description     String?
+  /// When the deadline is due.
+  dueDate         DateTime @map("due_date")
+  /// Days before dueDate to send a reminder (default 7).
+  reminderDays    Int      @default(7) @map("reminder_days")
+  /// Whether the reminder has been sent.
+  reminderSent    Boolean  @default(false) @map("reminder_sent")
+  /// Who is responsible for meeting the deadline.
+  assignedTo      String?  @map("assigned_to")
+  /// Status: 'pending', 'completed', 'overdue', 'cancelled'.
+  status          String   @default("pending")
+  completedAt     DateTime? @map("completed_at")
+  /// Priority for sorting on the dashboard: 'low', 'medium', 'high', 'urgent'.
+  priority        String   @default("medium")
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+  deletedBy       String?  @map("deleted_by")
+  rowVersion      Int      @default(0) @map("row_version")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, parentType, parentId])
+  @@index([organizationId, status, dueDate])
+  @@index([organizationId, dueDate])
+  @@index([assignedTo])
+  @@map("deadlines")
 }
 
 // ═══════════════════════════════════════════════════════════════

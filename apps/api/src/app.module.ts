@@ -16,6 +16,8 @@ import { TemplatesModule } from './templates/templates.module';
 import { ClausesModule } from './clauses/clauses.module';
 import { ApprovalsModule } from './approvals/approvals.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { SearchModule } from './search/search.module';
+import { DeadlinesModule } from './deadlines/deadlines.module';
 
 @Module({
   imports: [
@@ -41,6 +43,9 @@ import { NotificationsModule } from './notifications/notifications.module';
     ApprovalsModule,
     // Phase 6 — Notifications
     NotificationsModule,
+    // Phase 7 — Search & Deadlines
+    SearchModule,
+    DeadlinesModule,
   ],
 })
 export class AppModule {}
