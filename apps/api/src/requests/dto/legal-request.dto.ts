@@ -1,248 +1,94 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { LegalRequestType, LegalRequestStatus } from '@prisma/client';
 import {
   IsString,
   IsOptional,
   IsEnum,
-  IsInt,
-  Min,
-  Max,
-  IsDateString,
   IsUUID,
-  IsBoolean,
-  IsArray,
-  IsObject,
-  ValidateNested,
-  IsEmail,
+  IsInt,
+  IsIn,
+  MaxLength,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { LegalRequestStatus, ClassificationLevel } from '@glo/shared';
 
 export class CreateLegalRequestDto {
-  @ApiProperty({ enum: LegalRequestType })
-  @IsEnum(LegalRequestType)
-  type: LegalRequestType;
-
-  @ApiProperty()
   @IsString()
-  title: string;
+  @MaxLength(255)
+  title!: string;
 
-  @ApiProperty()
-  @IsString()
-  description: string;
-
-  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  clientName?: string;
+  @MaxLength(255)
+  titleEn?: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsEmail()
-  clientEmail?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  clientPhone?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsDateString()
-  deadline?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(10)
-  priority?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  tags?: string[];
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsObject()
-  metadata?: Record<string, any>;
-}
-
-export class UpdateLegalRequestDto {
-  @ApiPropertyOptional({ enum: LegalRequestType })
-  @IsOptional()
-  @IsEnum(LegalRequestType)
-  type?: LegalRequestType;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  title?: string;
-
-  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  clientName?: string;
+  type?: string;
 
-  @ApiPropertyOptional()
   @IsOptional()
-  @IsEmail()
-  clientEmail?: string;
+  @IsIn(['low', 'medium', 'high', 'urgent'])
+  priority?: string;
 
-  @ApiPropertyOptional()
   @IsOptional()
-  @IsString()
-  clientPhone?: string;
+  @IsEnum(ClassificationLevel)
+  classification?: ClassificationLevel;
 
-  @ApiPropertyOptional()
   @IsOptional()
-  @IsDateString()
-  deadline?: string;
+  @IsUUID()
+  entityId?: string;
 
-  @ApiPropertyOptional()
   @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(10)
-  priority?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  tags?: string[];
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsObject()
-  metadata?: Record<string, any>;
-
-  @ApiPropertyOptional({ enum: LegalRequestStatus })
-  @IsOptional()
-  @IsEnum(LegalRequestStatus)
-  status?: LegalRequestStatus;
+  @IsUUID()
+  assignedTo?: string;
 }
 
-export class LegalRequestResponseDto {
-  @ApiProperty()
+export class UpdateLegalRequestDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  titleEn?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  type?: string;
+
+  @IsOptional()
+  @IsIn(['low', 'medium', 'high', 'urgent'])
+  priority?: string;
+
+  @IsOptional()
   @IsUUID()
-  id: string;
+  entityId?: string;
 
-  @ApiProperty({ enum: LegalRequestType })
-  @IsEnum(LegalRequestType)
-  type: LegalRequestType;
-
-  @ApiProperty({ enum: LegalRequestStatus })
-  @IsEnum(LegalRequestStatus)
-  status: LegalRequestStatus;
-
-  @ApiProperty()
-  @IsString()
-  title: string;
-
-  @ApiProperty()
-  @IsString()
-  description: string;
-
-  @ApiPropertyOptional()
   @IsOptional()
-  @IsString()
-  clientName?: string;
+  @IsUUID()
+  assignedTo?: string;
 
-  @ApiPropertyOptional()
   @IsOptional()
-  @IsEmail()
-  clientEmail?: string;
+  @IsEnum(ClassificationLevel)
+  classification?: ClassificationLevel;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  clientPhone?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsDateString()
-  deadline?: string;
-
-  @ApiPropertyOptional()
   @IsOptional()
   @IsInt()
-  @Min(1)
-  @Max(10)
-  priority?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  tags?: string[];
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsObject()
-  metadata?: Record<string, any>;
-
-  @ApiProperty()
-  @IsDateString()
-  createdAt: Date;
-
-  @ApiProperty()
-  @IsDateString()
-  updatedAt: Date;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsUUID()
-  createdById?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsUUID()
-  assignedToId?: string;
+  rowVersion?: number;
 }
 
-export class LegalRequestQueryDto {
-  @ApiPropertyOptional({ enum: LegalRequestType })
-  @IsOptional()
-  @IsEnum(LegalRequestType)
-  type?: LegalRequestType;
-
-  @ApiPropertyOptional({ enum: LegalRequestStatus })
-  @IsOptional()
+export class TransitionLegalRequestDto {
   @IsEnum(LegalRequestStatus)
-  status?: LegalRequestStatus;
+  to!: LegalRequestStatus;
 
-  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  search?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  page?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  sortBy?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsEnum(['asc', 'desc'])
-  sortOrder?: 'asc' | 'desc';
+  reason?: string;
 }
